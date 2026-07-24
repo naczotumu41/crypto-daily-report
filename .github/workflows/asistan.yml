@@ -79,7 +79,7 @@ jobs:
       - name: Durumu kaydet
         run: |
           degisti=false
-          for f in state/asistan.json state/gorevler.json; do
+          for f in state/asistan.json state/gorevler.json state/hafiza.json; do
             if [ -f "$f" ] && [ -n "$(git status --porcelain "$f" 2>/dev/null)" ]; then
               git add "$f"
               degisti=true

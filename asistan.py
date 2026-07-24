@@ -11,6 +11,11 @@ yerine getiren ek katman. GitHub Actions'ta ayrı bir workflow (asistan.yml)
 her birkaç dakikada bir çalışır; yeni mesaj/vadesi gelmiş görev yoksa
 Claude'a hiç dokunmadan çıkar.
 
+Her cevapta, kullanıcı hakkında öğrenilen kalıcı bilgiler (ilgilendiği
+coin'ler, risk toleransı, tercih ettiği üslup vb.) state/hafiza.json'a
+biriktirilir ve bir sonraki soruda tekrar Claude'a bağlam olarak verilir —
+böylece asistan zamanla kullanıcıyı "tanır".
+
 Kullanım:
   python asistan.py --kontrol   Yanıt bekleyen admin mesajı YA DA vadesi gelmiş
                                  mail görevi var mı bakar (Claude'a DOKUNMAZ,
@@ -62,12 +67,17 @@ _env_yukle()
 
 STATE_YOL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "state", "asistan.json")
 GOREVLER_YOL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "state", "gorevler.json")
+HAFIZA_YOL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "state", "hafiza.json")
+HAFIZA_UST_SINIR = 200  # notlar bunu aşarsa en eskiler düşürülür
 
 # SORU PROMPTU — admin'in tek bir mesajına verilecek cevabı üretmek için
-# headless Claude Code'a verilir. {soru} ve {simdi} çalışma anında doldurulur.
+# headless Claude Code'a verilir. {soru}, {simdi} ve {hafiza} çalışma anında doldurulur.
 SORU_PROMPTU = """Sen Telegram'da çalışan bir kripto/piyasa asistanısın. Kullanıcı (botun sahibi) sana özel olarak aşağıdaki mesajı yazdı.
 
 BUGÜNÜN TARİHİ VE SAATİ (TSİ): {simdi}
+
+KULLANICI HAKKINDA BİLDİKLERİN (varsa, cevabını buna göre kişiselleştir):
+{hafiza}
 
 KULLANICININ MESAJI:
 {soru}
@@ -97,6 +107,19 @@ DURUM B — Diğer her şey (soru, haber talebi, "neden düştü/battı" gibi a�
     geliştirilmekte olduğunu belirt.
   - Finansal görüş/yorum içeren cevapların sonuna kısaca "Yatırım tavsiyesi
     değildir." ekle.
+
+GENEL KURAL — HAFIZA GÜNCELLEME (DURUM A/B fark etmez):
+Bu mesajdan kullanıcı hakkında YENİ ve KALICI bir bilgi/tercih öğrendiysen
+(ör. hangi coin'lerle ilgilendiği, risk toleransı, hangi tür raporu/üslubu
+sevdiği, tekrar eden istekleri), cevabının/görev bloğunun ALTINA ayrı bir
+blok olarak ekle (Telegram'a GİTMEYECEK, sistem tarafından okunacak):
+===HAFIZA===
+["yeni kalıcı not 1", "yeni kalıcı not 2"]
+===HAFIZA-SON===
+- Sadece GERÇEKTEN yeni bilgi varsa ekle; yukarıdaki BİLDİKLERİN listesinde
+  zaten varsa veya önemsiz/geçiciyse bu bloğu HİÇ yazma.
+- Notlar kısa, üçüncü tekil şahısla, tekrar kullanılabilir olsun
+  (ör. "Uzun vadeli yatırımcı, kısa vadeli işlem önerisi istemiyor").
 
 Cevap SADECE ilgili durumun çıktısı olsun; "işte cevabım" gibi ek ifade yazma."""
 
@@ -196,8 +219,57 @@ def _gorev_ayikla(cevap):
                 gorev = v
         except ValueError:
             gorev = None
-    temiz = re.split(r"===GOREV===", cevap, maxsplit=1)[0].strip()
+    temiz = re.sub(r"===GOREV===.*?===GOREV-SON===", "", cevap, flags=re.S).strip()
     return temiz, gorev
+
+
+def _hafiza_notlarini_ayikla(cevap):
+    """Claude'un ham cevabından ===HAFIZA===...===HAFIZA-SON=== bloğunu ayıklar.
+    (temiz_cevap, yeni_notlar_listesi) döndürür."""
+    m = re.search(r"===HAFIZA===\s*(.*?)\s*===HAFIZA-SON===", cevap, re.S)
+    notlar = []
+    if m:
+        try:
+            v = json.loads(m.group(1).strip())
+            if isinstance(v, list):
+                notlar = [str(x).strip() for x in v if str(x).strip()]
+        except ValueError:
+            notlar = []
+    temiz = re.sub(r"===HAFIZA===.*?===HAFIZA-SON===", "", cevap, flags=re.S).strip()
+    return temiz, notlar
+
+
+# --------------------------------------------------------------------------- #
+# Hafıza (kullanıcı hakkında kalıcı notlar) yönetimi
+# --------------------------------------------------------------------------- #
+
+def _hafizayi_oku():
+    try:
+        with open(HAFIZA_YOL, encoding="utf-8") as f:
+            v = json.load(f).get("notlar", [])
+        return v if isinstance(v, list) else []
+    except (FileNotFoundError, ValueError, OSError):
+        return []
+
+
+def _hafizayi_yaz(notlar):
+    os.makedirs(os.path.dirname(HAFIZA_YOL), exist_ok=True)
+    with open(HAFIZA_YOL, "w", encoding="utf-8") as f:
+        json.dump({"notlar": notlar}, f, ensure_ascii=False, indent=2)
+
+
+def _hafizaya_ekle(yeni_notlar):
+    """Yeni notları mevcut hafızaya ekler (tekrarları atlar, listeyi
+    HAFIZA_UST_SINIR ile sınırlar — en eski notlar düşürülür)."""
+    if not yeni_notlar:
+        return
+    notlar = _hafizayi_oku()
+    for n in yeni_notlar:
+        if n not in notlar:
+            notlar.append(n)
+    if len(notlar) > HAFIZA_UST_SINIR:
+        notlar = notlar[-HAFIZA_UST_SINIR:]
+    _hafizayi_yaz(notlar)
 
 
 def _hedef_zamani_ayristir(deger):
@@ -328,10 +400,17 @@ def cevapla(bot_token, admin_id):
         simdi_str = datetime.now(IST).strftime("%d.%m.%Y %H:%M, %A")
         for soru in mesajlar:
             print(f"[bilgi] Soru cevaplanıyor: {soru[:80]!r}", file=sys.stderr)
+            notlar = _hafizayi_oku()
+            hafiza_str = "\n".join(f"- {n}" for n in notlar) if notlar else "Henüz bir şey kaydedilmedi."
             try:
-                ham = _claude_calistir(SORU_PROMPTU.format(soru=soru, simdi=simdi_str),
-                                       min_uzunluk=10)
+                ham = _claude_calistir(
+                    SORU_PROMPTU.format(soru=soru, simdi=simdi_str, hafiza=hafiza_str),
+                    min_uzunluk=10)
                 cevap, gorev = _gorev_ayikla(ham)
+                cevap, yeni_notlar = _hafiza_notlarini_ayikla(cevap)
+                if yeni_notlar:
+                    print(f"[bilgi] Hafızaya {len(yeni_notlar)} yeni not eklendi.", file=sys.stderr)
+                    _hafizaya_ekle(yeni_notlar)
             except Exception as e:                   # noqa: BLE001
                 cevap = f"⚠️ Bu soruyu cevaplarken bir hata oluştu: {html.escape(str(e)[:300])}"
                 gorev = None

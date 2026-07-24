@@ -74,6 +74,78 @@ class GorevAyiklama(unittest.TestCase):
         self.assertIsNone(gorev)
 
 
+class HafizaAyiklama(unittest.TestCase):
+    def test_hafiza_blogu_ayiklanir_ve_metinden_temizlenir(self):
+        ham = (
+            "BTC bugün %3 düştü.\n"
+            "===HAFIZA===\n"
+            '["Uzun vadeli yatırımcı, kısa vadeli işlem önerisi istemiyor"]\n'
+            "===HAFIZA-SON==="
+        )
+        temiz, notlar = asistan._hafiza_notlarini_ayikla(ham)
+        self.assertEqual(temiz, "BTC bugün %3 düştü.")
+        self.assertEqual(notlar, ["Uzun vadeli yatırımcı, kısa vadeli işlem önerisi istemiyor"])
+
+    def test_hafiza_blogu_yoksa_bos_liste_doner(self):
+        temiz, notlar = asistan._hafiza_notlarini_ayikla("Sadece normal bir cevap.")
+        self.assertEqual(temiz, "Sadece normal bir cevap.")
+        self.assertEqual(notlar, [])
+
+    def test_gorev_ve_hafiza_blogu_birlikte_temizlenir(self):
+        ham = (
+            "Tamam, yarın göndereceğim.\n"
+            "===GOREV===\n"
+            '{"hedef_zaman": "2026-07-25T09:00:00+03:00", "icerik_talebi": "BTC özeti"}\n'
+            "===GOREV-SON===\n"
+            "===HAFIZA===\n"
+            '["Her sabah BTC özeti istiyor"]\n'
+            "===HAFIZA-SON==="
+        )
+        temiz1, gorev = asistan._gorev_ayikla(ham)
+        temiz2, notlar = asistan._hafiza_notlarini_ayikla(temiz1)
+        self.assertEqual(temiz2, "Tamam, yarın göndereceğim.")
+        self.assertEqual(gorev["icerik_talebi"], "BTC özeti")
+        self.assertEqual(notlar, ["Her sabah BTC özeti istiyor"])
+
+
+class HafizaKaydetme(unittest.TestCase):
+    def setUp(self):
+        self._orig_oku = asistan._hafizayi_oku
+        self._orig_yaz = asistan._hafizayi_yaz
+        self._yazilan = None
+
+    def tearDown(self):
+        asistan._hafizayi_oku = self._orig_oku
+        asistan._hafizayi_yaz = self._orig_yaz
+
+    def test_yeni_not_eklenir(self):
+        asistan._hafizayi_oku = lambda: ["mevcut not"]
+        asistan._hafizayi_yaz = lambda notlar: setattr(self, "_yazilan", notlar)
+        asistan._hafizaya_ekle(["yeni not"])
+        self.assertEqual(self._yazilan, ["mevcut not", "yeni not"])
+
+    def test_tekrar_eden_not_eklenmez(self):
+        asistan._hafizayi_oku = lambda: ["aynı not"]
+        asistan._hafizayi_yaz = lambda notlar: setattr(self, "_yazilan", notlar)
+        asistan._hafizaya_ekle(["aynı not"])
+        self.assertEqual(self._yazilan, ["aynı not"])
+
+    def test_bos_liste_yazmayi_tetiklemez(self):
+        asistan._hafizayi_oku = lambda: ["mevcut not"]
+        asistan._hafizayi_yaz = lambda notlar: setattr(self, "_yazilan", notlar)
+        asistan._hafizaya_ekle([])
+        self.assertIsNone(self._yazilan)
+
+    def test_ust_sinir_asilinca_en_eskiler_dusurulur(self):
+        eski = [f"not {i}" for i in range(asistan.HAFIZA_UST_SINIR)]
+        asistan._hafizayi_oku = lambda: eski
+        asistan._hafizayi_yaz = lambda notlar: setattr(self, "_yazilan", notlar)
+        asistan._hafizaya_ekle(["en yeni not"])
+        self.assertEqual(len(self._yazilan), asistan.HAFIZA_UST_SINIR)
+        self.assertEqual(self._yazilan[-1], "en yeni not")
+        self.assertNotIn("not 0", self._yazilan)
+
+
 class HedefZamanAyristirma(unittest.TestCase):
     def test_ofsetli_zaman_aynen_kullanilir(self):
         hz = asistan._hedef_zamani_ayristir("2026-07-25T14:00:00+03:00")
