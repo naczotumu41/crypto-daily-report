@@ -1,0 +1,86 @@
+name: Kripto Asistan (Soru-Cevap)
+
+# Admin Telegram'da bota özelden yazdığında birkaç dakika içinde cevap versin
+# diye her 5 dakikada bir "yeni mesaj var mı" diye bakar. Claude Code CLI
+# kurulumu (yavaş adım) SADECE gerçekten cevaplanacak bir mesaj varsa çalışır
+# — boşuna her 5 dakikada bir kurulum yapıp Actions dakikası harcamamak için.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:            # GitHub arayüzünden elle çalıştırma (test için)
+
+concurrency:
+  group: asistan
+  cancel-in-progress: false
+
+jobs:
+  kontrol:
+    runs-on: ubuntu-latest
+    outputs:
+      mesaj_var: ${{ steps.kontrol.outputs.mesaj_var }}
+    steps:
+      - name: Repoyu çek
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Python bağımlılıklarını kur
+        run: pip install -r requirements.txt
+
+      - name: Yeni mesaj var mı bak (Claude'a dokunmadan)
+        id: kontrol
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ADMIN_CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
+        run: python asistan.py --kontrol
+
+  cevapla:
+    needs: kontrol
+    if: needs.kontrol.outputs.mesaj_var == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Repoyu çek
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Python 3.11 kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Node.js kur (Claude Code CLI için)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Python bağımlılıklarını kur
+        run: pip install -r requirements.txt
+
+      - name: Claude Code CLI kur
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Bekleyen soruları cevapla
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          TELEGRAM_BOT_TOKEN:      ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ADMIN_CHAT_ID:  ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
+        run: python asistan.py
+
+      - name: Durumu kaydet
+        run: |
+          if [ -n "$(git status --porcelain state/asistan.json 2>/dev/null)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add state/asistan.json
+            git commit -m "chore: asistan durumu"
+            git pull --rebase --autostash origin main || true
+            git push || echo "push basarisiz (best-effort)"
+          else
+            echo "durum degismedi"
+          fi

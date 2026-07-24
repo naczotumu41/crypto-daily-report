@@ -278,11 +278,14 @@ def tarih_basligi():
     return f"{now.day} {TR_AYLAR[now.month - 1]} {now.year}, {TR_GUNLER[now.weekday()]}"
 
 
-def rapor_uret(market_data, dun_takip_str=""):
+def _claude_calistir(prompt, min_uzunluk=200):
     """
-    Headless Claude Code'u (claude -p) çağırır. Anthropic API KEY kullanmaz;
-    kimlik doğrulama CLAUDE_CODE_OAUTH_TOKEN ile abonelikten yapılır.
-    Sadece WebSearch/WebFetch araçlarına izin verilir.
+    Headless Claude Code'u (claude -p) verilen prompt ile çağırır ve düz metin
+    çıktısını döndürür. Anthropic API KEY kullanmaz; kimlik doğrulama
+    CLAUDE_CODE_OAUTH_TOKEN ile abonelikten yapılır. Sadece WebSearch/WebFetch
+    araçlarına izin verilir. Geçici hatalarda (rate/hiçkırık) MAX_RETRY kez dener.
+
+    rapor_uret ve asistan.py'deki soru-cevap akışı bu fonksiyonu paylaşır.
     """
     # Windows'ta npm 'claude' (bash script) + 'claude.cmd' üretir; subprocess ancak
     # .cmd/.exe çalıştırabilir. Bu yüzden platforma göre uygun olanı seç.
@@ -298,12 +301,6 @@ def rapor_uret(market_data, dun_takip_str=""):
         print("[uyarı] CLAUDE_CODE_OAUTH_TOKEN yok; mevcut yerel claude oturumu "
               "kullanılacak (CI'da secret gereklidir).", file=sys.stderr)
 
-    prompt = RAPOR_PROMPTU.format(market_data=market_data, tarih=tarih_basligi())
-    if dun_takip_str:
-        prompt += chr(10) * 2 + "DÜNKÜ TAKİP MADDELERİ (⏮️ DÜNDEN için sonuçlarını araştır): " + dun_takip_str
-    else:
-        prompt += chr(10) * 2 + "DÜNKÜ TAKİP MADDELERİ: yok (⏮️ DÜNDEN bölümünü atla)."
-
     # Çıktıyı düz metin olarak alıyoruz. --allowedTools ile sadece web araçlarına izin.
     komut = [
         claude_bin,
@@ -312,9 +309,6 @@ def rapor_uret(market_data, dun_takip_str=""):
         "--output-format", "text",
     ]
 
-    print("[bilgi] Claude Code raporu üretiyor (web araması yapılıyor)...", file=sys.stderr)
-    # Geçici claude hatalarına (rate/hiçkırık) karşı birkaç kez dene — 08:00 raporu
-    # tek bir aksaklıkta atlanmasın.
     son_hata = None
     for deneme in range(1, MAX_RETRY + 1):
         try:
@@ -331,17 +325,29 @@ def rapor_uret(market_data, dun_takip_str=""):
                 son_hata = "kod %d: %s" % (
                     sonuc.returncode,
                     (sonuc.stderr.strip() or sonuc.stdout.strip() or "(çıktı boş)")[:600])
-            elif len((sonuc.stdout or "").strip()) < 200:
+            elif len((sonuc.stdout or "").strip()) < min_uzunluk:
                 son_hata = "beklenenden kısa çıktı: %r" % (sonuc.stdout or "").strip()
             else:
                 return sonuc.stdout.strip()
 
-        print(f"[uyarı] Rapor üretimi başarısız ({deneme}/{MAX_RETRY}): {son_hata}",
+        print(f"[uyarı] Claude çağrısı başarısız ({deneme}/{MAX_RETRY}): {son_hata}",
               file=sys.stderr)
         if deneme < MAX_RETRY:
             time.sleep(8 * deneme)
 
-    raise RuntimeError(f"Claude Code {MAX_RETRY} denemede rapor üretemedi: {son_hata}")
+    raise RuntimeError(f"Claude Code {MAX_RETRY} denemede yanıt üretemedi: {son_hata}")
+
+
+def rapor_uret(market_data, dun_takip_str=""):
+    """Günlük rapor promptunu doldurup _claude_calistir ile Claude Code'u çağırır."""
+    prompt = RAPOR_PROMPTU.format(market_data=market_data, tarih=tarih_basligi())
+    if dun_takip_str:
+        prompt += chr(10) * 2 + "DÜNKÜ TAKİP MADDELERİ (⏮️ DÜNDEN için sonuçlarını araştır): " + dun_takip_str
+    else:
+        prompt += chr(10) * 2 + "DÜNKÜ TAKİP MADDELERİ: yok (⏮️ DÜNDEN bölümünü atla)."
+
+    print("[bilgi] Claude Code raporu üretiyor (web araması yapılıyor)...", file=sys.stderr)
+    return _claude_calistir(prompt)
 
 
 # --------------------------------------------------------------------------- #

@@ -19,6 +19,16 @@ Bu bir "otomatik rapor" değil. Uyandığında tam ihtiyacın olan bilgiyi — g
 
 ---
 
+## 💬 Soru-cevap asistanı (yeni)
+
+Günlük rapora ek olarak, bota **özelden** yazdığın sorulara da cevap verir: haberleri sorabilir, "bu kripto neden düştü/battı" diye sorabilir, genel piyasa sorularını sorabilirsin. Cevaplar Claude'un canlı web araması yaparak ürettiği metinlerdir; net bir alım/satım fiyat seviyesi istersen bunu şu an hesaplayamadığını söyler (uydurma sayı vermez) — bu, ayrıca geliştirilmekte olan bir sonraki özellik.
+
+- Yalnızca **admin** (senin özel sohbetin, `TELEGRAM_ADMIN_CHAT_ID`) sorduğunda cevap verir; ekstra secret gerekmez, mevcut 4 token yeterli.
+- `.github/workflows/asistan.yml` her 5 dakikada bir "yeni mesaj var mı" diye bakar (ücretsiz, hafif bir adım); mesaj varsa Claude Code'u çalıştırıp cevabı gönderir. Yani cevap anlık değil, en fazla ~5 dakika gecikebilir.
+- Botuna Telegram'dan özel mesaj at, birkaç dakika içinde cevap gelir.
+
+---
+
 ## 🔧 Perde arkası (3 adım)
 
 1. **Sabit veriler** — CoinGecko + Alternative.me'den fiyatlar, dominans, hacim, Fear & Greed (LLM yok → halüsinasyon yok).
@@ -127,14 +137,17 @@ Saati değiştirmek için workflow'daki `DELIVER_AT_TR` değerini (ve istersen c
 ```
 .
 ├── report.py            # Ana akış: veri → rapor → kart + brief + ses + detay gönderimi
+├── asistan.py           # Soru-cevap asistanı: Telegram'daki admin sorularını Claude ile cevaplar
 ├── kart.py              # Paylaşılabilir sabah kartı (Pillow)
 ├── ses.py               # 45 sn sesli özet (edge-tts + ffmpeg)
 ├── setup.py             # Kurulum sihirbazı (chat_id, test, .env, GitHub)
 ├── requirements.txt     # requests, Pillow, edge-tts, tzdata
 ├── state/takip.json     # "Dünden hesap" hafızası (otomatik oluşur)
-├── .github/workflows/   # daily-report.yml (08:00 TSİ) + tests.yml
+├── state/asistan.json   # Soru-cevap asistanının son okuduğu mesaj (otomatik oluşur)
+├── .github/workflows/   # daily-report.yml (08:00 TSİ) + asistan.yml (5 dk'da bir) + tests.yml
 ├── CLAUDE.md            # Claude Code'un otomatik kurulum rehberi
 ├── test_report.py       # Birim testler
+├── test_asistan.py      # Soru-cevap asistanı için birim testler
 ├── LICENSE              # MIT
 └── .env.example
 ```
