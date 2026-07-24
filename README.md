@@ -19,13 +19,16 @@ Bu bir "otomatik rapor" değil. Uyandığında tam ihtiyacın olan bilgiyi — g
 
 ---
 
-## 💬 Soru-cevap asistanı (yeni)
+## 💬 Soru-cevap asistanı + zamanlı mail (yeni)
 
 Günlük rapora ek olarak, bota **özelden** yazdığın sorulara da cevap verir: haberleri sorabilir, "bu kripto neden düştü/battı" diye sorabilir, genel piyasa sorularını sorabilirsin. Cevaplar Claude'un canlı web araması yaparak ürettiği metinlerdir; net bir alım/satım fiyat seviyesi istersen bunu şu an hesaplayamadığını söyler (uydurma sayı vermez) — bu, ayrıca geliştirilmekte olan bir sonraki özellik.
 
-- Yalnızca **admin** (senin özel sohbetin, `TELEGRAM_ADMIN_CHAT_ID`) sorduğunda cevap verir; ekstra secret gerekmez, mevcut 4 token yeterli.
-- `.github/workflows/asistan.yml` her 5 dakikada bir "yeni mesaj var mı" diye bakar (ücretsiz, hafif bir adım); mesaj varsa Claude Code'u çalıştırıp cevabı gönderir. Yani cevap anlık değil, en fazla ~5 dakika gecikebilir.
+Ayrıca **"25 Temmuz saat 09:00'da bana BTC durumunu mail at"** gibi zamanlı görevler verebilirsin: bot "tamam, o saatte göndereceğim" diye onaylar, tam vaktinde (en fazla ~5 dk gecikmeyle) o anki güncel bilgiyle bir mail hazırlayıp gönderir ve Telegram'dan "mail gönderildi" diye haber verir. Görev tek seferliktir (tekrarlayan/periyodik görev desteklenmiyor).
+
+- Yalnızca **admin** (senin özel sohbetin, `TELEGRAM_ADMIN_CHAT_ID`) sorduğunda/görev verdiğinde işlem yapılır; kanaldaki ya da botla konuşan başka biri Claude/mail kotasını tüketemez.
+- `.github/workflows/asistan.yml` her 5 dakikada bir "yeni mesaj / vadesi gelmiş görev var mı" diye bakar (ücretsiz, hafif bir adım); bir şey varsa Claude Code'u çalıştırıp cevabı/maili üretir. Yani hem cevaplar hem mailler anlık değil, en fazla ~5 dakika gecikebilir.
 - Botuna Telegram'dan özel mesaj at, birkaç dakika içinde cevap gelir.
+- **Mail özelliği için 3 EK secret gerekir** (Gmail SMTP, tamamen ücretsiz) — aşağıdaki secret tablosuna bak. Bu 3'ü eklemezsen soru-cevap kısmı yine çalışır, sadece mail görevi verdiğinde hata bildirimi alırsın.
 
 ---
 
@@ -109,6 +112,14 @@ python report.py --test    # rapor kanala DEĞİL, sadece sana (admin) gider
    | `TELEGRAM_CHAT_ID` | Kanal id (`@kanal` veya `-100...`) |
    | `TELEGRAM_ADMIN_CHAT_ID` | Senin özel chat id'in |
 
+   **Zamanlı mail özelliğini de istiyorsan** (opsiyonel) şu 3 secret'ı da ekle:
+
+   | Secret | Değer |
+   |---|---|
+   | `SMTP_GMAIL_ADRES` | Gönderici Gmail adresin |
+   | `SMTP_UYGULAMA_SIFRESI` | Google hesabında 2 adımlı doğrulamayı açtıktan sonra [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)'tan üretilen 16 haneli uygulama şifresi (normal Gmail şifren DEĞİL) |
+   | `ALICI_EMAIL` | Maillerin gideceği adres |
+
 ---
 
 ## Sık sorulanlar
@@ -137,13 +148,14 @@ Saati değiştirmek için workflow'daki `DELIVER_AT_TR` değerini (ve istersen c
 ```
 .
 ├── report.py            # Ana akış: veri → rapor → kart + brief + ses + detay gönderimi
-├── asistan.py           # Soru-cevap asistanı: Telegram'daki admin sorularını Claude ile cevaplar
+├── asistan.py           # Soru-cevap asistanı: admin sorularını Claude ile cevaplar, zamanlı mail görevlerini yönetir
 ├── kart.py              # Paylaşılabilir sabah kartı (Pillow)
 ├── ses.py               # 45 sn sesli özet (edge-tts + ffmpeg)
 ├── setup.py             # Kurulum sihirbazı (chat_id, test, .env, GitHub)
 ├── requirements.txt     # requests, Pillow, edge-tts, tzdata
 ├── state/takip.json     # "Dünden hesap" hafızası (otomatik oluşur)
 ├── state/asistan.json   # Soru-cevap asistanının son okuduğu mesaj (otomatik oluşur)
+├── state/gorevler.json  # Zamanlı mail görevleri (bekliyor/gönderildi/hata) (otomatik oluşur)
 ├── .github/workflows/   # daily-report.yml (08:00 TSİ) + asistan.yml (5 dk'da bir) + tests.yml
 ├── CLAUDE.md            # Claude Code'un otomatik kurulum rehberi
 ├── test_report.py       # Birim testler
