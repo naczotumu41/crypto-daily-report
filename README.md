@@ -30,6 +30,8 @@ Ayrıca **"25 Temmuz saat 09:00'da bana BTC durumunu mail at"** gibi zamanlı g�
 - Botuna Telegram'dan özel mesaj at, birkaç dakika içinde cevap gelir.
 - **Mail özelliği için 3 EK secret gerekir** (Gmail SMTP, tamamen ücretsiz) — aşağıdaki secret tablosuna bak. Bu 3'ü eklemezsen soru-cevap kısmı yine çalışır, sadece mail görevi verdiğinde hata bildirimi alırsın.
 
+**Ayrıca seni zamanla "tanır":** Her cevaptan sonra, hakkında öğrendiği kalıcı bir bilgi/tercih varsa (ör. hangi coin'lerle ilgilendiğin, risk toleransın, sevdiğin rapor üslubu) bunu `state/hafiza.json`'a sessizce kaydeder ve bir sonraki soruda bunu bağlam olarak kullanır — bu ekstra secret ya da kurulum gerektirmez, otomatik işler.
+
 ---
 
 ## 🔧 Perde arkası (3 adım)
@@ -156,6 +158,7 @@ Saati değiştirmek için workflow'daki `DELIVER_AT_TR` değerini (ve istersen c
 ├── state/takip.json     # "Dünden hesap" hafızası (otomatik oluşur)
 ├── state/asistan.json   # Soru-cevap asistanının son okuduğu mesaj (otomatik oluşur)
 ├── state/gorevler.json  # Zamanlı mail görevleri (bekliyor/gönderildi/hata) (otomatik oluşur)
+├── state/hafiza.json    # Kullanıcı hakkında öğrenilen kalıcı notlar (otomatik oluşur)
 ├── .github/workflows/   # daily-report.yml (08:00 TSİ) + asistan.yml (5 dk'da bir) + tests.yml
 ├── CLAUDE.md            # Claude Code'un otomatik kurulum rehberi
 ├── test_report.py       # Birim testler
