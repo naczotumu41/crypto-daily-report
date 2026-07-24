@@ -1,0 +1,11 @@
+{
+  "gorevler": [
+    {
+      "id": "a258c500",
+      "hedef_zaman": "2026-07-25T10:00:00+03:00",
+      "icerik_talebi": "Ethereum (ETH) hakkında detaylı, güncel araştırmaya dayalı bir rapor hazırla ve mail olarak gönder. Aşağıdaki başlıkların her birini ayrı ayrı ve detaylıca ele al: 1) Ethereum'un gerçek kullanım alanları (DeFi, NFT, stablecoin altyapısı, kurumsal kullanım vb.), 2) Ağ büyümesinin ETH'ye değer aktarımı (işlem hacmi, ücret geliri, EIP-1559 etkisi), 3) Arz, yakım (burn) ve staking ekonomisi (dolaşımdaki arz, yakım oranları, staking oranı ve getirisi), 4) Layer-2 ilişkisi (Arbitrum, Optimism, Base gibi L2'lerin ETH değerine etkisi, blob fee/data availability geliri), 5) Rakiplere karşı pazar payı (Solana, BNB Chain, diğer L1'ler karşısında piyasa değeri ve geliştirici/kullanıcı aktivitesi kıyası), 6) Teknik ve merkeziyetçilik riskleri (validator dağılımı, Lido gibi staking havuzlarının merkeziyetçilik etkisi, MEV, güvenlik açıkları), 7) Regülasyon (ABD SEC/CFTC durumu, AB MiCA, ETF gelişmeleri), 8) Değerleme (mevcut fiyat, piyasa değeri, çeşitli değerleme yaklaşımları - varsa analist görüşleri, ancak uydurma rakam verme, doğrulanamayanı belirt), 9) Tezi bozan koşullar (hangi gelişmeler Ethereum'a yatırım tezini geçersiz kılar), 10) Pozisyon büyüklüğü ve alım planı (genel risk yönetimi ve kademeli alım mantığı üzerinden - kesin fiyat seviyesi UYDURMA, teknik/canlı grafik verisine erişim olmadığını belirt). Güncel haberleri ve gelişmeleri web aramasıyla doğrula, sadece doğrulanan bilgileri yaz. Telegram HTML formatı kullan (<b>, <i>, <a href='')), markdown kullanma. Rapor uzun olacağından gerekirse bölümler halinde organize et. Sonuna 'Yatırım tavsiyesi değildir.' ekle.",
+      "olusturulma_zamani": "2026-07-24T18:54:53.163664+03:00",
+      "durum": "bekliyor"
+    }
+  ]
+}
