@@ -1,9 +1,10 @@
-name: Kripto Asistan (Soru-Cevap)
+name: Kripto Asistan (Soru-Cevap + Zamanlı Mail)
 
 # Admin Telegram'da bota özelden yazdığında birkaç dakika içinde cevap versin
-# diye her 5 dakikada bir "yeni mesaj var mı" diye bakar. Claude Code CLI
-# kurulumu (yavaş adım) SADECE gerçekten cevaplanacak bir mesaj varsa çalışır
-# — boşuna her 5 dakikada bir kurulum yapıp Actions dakikası harcamamak için.
+# ve "şu gün şu saatte mail at" görevleri zamanında gitsin diye her 5 dakikada
+# bir "yeni mesaj / vadesi gelmiş görev var mı" diye bakar. Claude Code CLI
+# kurulumu (yavaş adım) SADECE gerçekten işlenecek bir şey varsa çalışır —
+# boşuna her 5 dakikada bir kurulum yapıp Actions dakikası harcamamak için.
 on:
   schedule:
     - cron: "*/5 * * * *"
@@ -30,7 +31,7 @@ jobs:
       - name: Python bağımlılıklarını kur
         run: pip install -r requirements.txt
 
-      - name: Yeni mesaj var mı bak (Claude'a dokunmadan)
+      - name: Yeni mesaj / vadesi gelmiş görev var mı bak (Claude'a dokunmadan)
         id: kontrol
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -65,19 +66,28 @@ jobs:
       - name: Claude Code CLI kur
         run: npm install -g @anthropic-ai/claude-code
 
-      - name: Bekleyen soruları cevapla
+      - name: Bekleyen soruları cevapla ve vadesi gelen mailleri gönder
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           TELEGRAM_BOT_TOKEN:      ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_ADMIN_CHAT_ID:  ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
+          SMTP_GMAIL_ADRES:        ${{ secrets.SMTP_GMAIL_ADRES }}
+          SMTP_UYGULAMA_SIFRESI:   ${{ secrets.SMTP_UYGULAMA_SIFRESI }}
+          ALICI_EMAIL:             ${{ secrets.ALICI_EMAIL }}
         run: python asistan.py
 
       - name: Durumu kaydet
         run: |
-          if [ -n "$(git status --porcelain state/asistan.json 2>/dev/null)" ]; then
+          degisti=false
+          for f in state/asistan.json state/gorevler.json; do
+            if [ -f "$f" ] && [ -n "$(git status --porcelain "$f" 2>/dev/null)" ]; then
+              git add "$f"
+              degisti=true
+            fi
+          done
+          if [ "$degisti" = true ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add state/asistan.json
             git commit -m "chore: asistan durumu"
             git pull --rebase --autostash origin main || true
             git push || echo "push basarisiz (best-effort)"

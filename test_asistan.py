@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 """asistan.py için basit birim testleri (ağ veya secret GEREKTİRMEZ)."""
 import unittest
+from datetime import datetime, timedelta
 
 import asistan
+from report import IST
 
 ADMIN = "111"
 BASKASI = "222"
@@ -39,6 +41,76 @@ class MesajAyiklama(unittest.TestCase):
         mesajlar, son_id = asistan._admin_mesajlarini_ayikla(guncellemeler, ADMIN)
         self.assertEqual(mesajlar, [])
         self.assertEqual(son_id, 9)
+
+
+class GorevAyiklama(unittest.TestCase):
+    def test_gorev_blogu_ayiklanir_ve_metinden_temizlenir(self):
+        ham = (
+            "Tamam, 25 Temmuz 2026 14:00 TSİ'de mail göndereceğim.\n"
+            "===GOREV===\n"
+            '{"hedef_zaman": "2026-07-25T14:00:00+03:00", '
+            '"icerik_talebi": "BTC ve ETH güncel fiyatlarını özetle"}\n'
+            "===GOREV-SON==="
+        )
+        temiz, gorev = asistan._gorev_ayikla(ham)
+        self.assertEqual(temiz, "Tamam, 25 Temmuz 2026 14:00 TSİ'de mail göndereceğim.")
+        self.assertEqual(gorev["hedef_zaman"], "2026-07-25T14:00:00+03:00")
+        self.assertEqual(gorev["icerik_talebi"], "BTC ve ETH güncel fiyatlarını özetle")
+
+    def test_gorev_blogu_yoksa_none_doner(self):
+        temiz, gorev = asistan._gorev_ayikla("Sadece normal bir cevap.")
+        self.assertEqual(temiz, "Sadece normal bir cevap.")
+        self.assertIsNone(gorev)
+
+    def test_bozuk_json_gorevi_yoksayar(self):
+        ham = "Tamam.\n===GOREV===\nbu json değil\n===GOREV-SON==="
+        temiz, gorev = asistan._gorev_ayikla(ham)
+        self.assertEqual(temiz, "Tamam.")
+        self.assertIsNone(gorev)
+
+    def test_eksik_alanli_gorev_yoksayilir(self):
+        ham = '===GOREV===\n{"hedef_zaman": "2026-07-25T14:00:00+03:00"}\n===GOREV-SON==='
+        _, gorev = asistan._gorev_ayikla(ham)
+        self.assertIsNone(gorev)
+
+
+class HedefZamanAyristirma(unittest.TestCase):
+    def test_ofsetli_zaman_aynen_kullanilir(self):
+        hz = asistan._hedef_zamani_ayristir("2026-07-25T14:00:00+03:00")
+        self.assertEqual(hz.utcoffset().total_seconds(), 3 * 3600)
+
+    def test_ofsetsiz_zamana_tsi_atanir(self):
+        hz = asistan._hedef_zamani_ayristir("2026-07-25T14:00:00")
+        self.assertEqual(hz.tzinfo, IST)
+
+
+class VadesiGelmisGorevKontrolu(unittest.TestCase):
+    def setUp(self):
+        self._orig_oku = asistan._gorevleri_oku
+
+    def tearDown(self):
+        asistan._gorevleri_oku = self._orig_oku
+
+    def test_gecmis_bekleyen_gorev_vadesi_gelmis_sayilir(self):
+        gecmis = (datetime.now(IST) - timedelta(minutes=5)).isoformat()
+        asistan._gorevleri_oku = lambda: [
+            {"durum": "bekliyor", "hedef_zaman": gecmis}
+        ]
+        self.assertTrue(asistan._vadesi_gelmis_gorev_var_mi())
+
+    def test_gelecekteki_gorev_vadesi_gelmemis_sayilir(self):
+        gelecek = (datetime.now(IST) + timedelta(hours=1)).isoformat()
+        asistan._gorevleri_oku = lambda: [
+            {"durum": "bekliyor", "hedef_zaman": gelecek}
+        ]
+        self.assertFalse(asistan._vadesi_gelmis_gorev_var_mi())
+
+    def test_gonderilmis_gorev_sayilmaz(self):
+        gecmis = (datetime.now(IST) - timedelta(minutes=5)).isoformat()
+        asistan._gorevleri_oku = lambda: [
+            {"durum": "gonderildi", "hedef_zaman": gecmis}
+        ]
+        self.assertFalse(asistan._vadesi_gelmis_gorev_var_mi())
 
 
 if __name__ == "__main__":
