@@ -1,0 +1,50 @@
+name: Futures Sinyalleri (Saatlik)
+
+# BTC/ETH/XRP/BNB için saatte bir Binance Futures'tan gerçek mum verisiyle
+# teknik seviye (giriş/stop/hedef) hesaplayıp SADECE admin'e Telegram'dan
+# gönderir. Sayılar Python'da hesaplanır (LLM'e uydurtulmaz); Claude sadece
+# kısa bir WebSearch destekli gerekçe ekler.
+#
+# NOT: GitHub'ın kendi cron zamanlayıcısı bu repo için güvenilmez bulundu
+# (bkz. proje notları / asistan.yml). Asıl tetikleme dışarıdan cron-job.org
+# ile saatte bir workflow_dispatch çağrılarak yapılıyor. Aşağıdaki `schedule`
+# sadece best-effort bir yedek.
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: futures
+  cancel-in-progress: false
+
+jobs:
+  sinyal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Repoyu çek
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Node.js kur (Claude Code CLI için)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Python bağımlılıklarını kur
+        run: pip install -r requirements.txt
+
+      - name: Claude Code CLI kur
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Futures sinyallerini üret ve gönder
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          TELEGRAM_BOT_TOKEN:      ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ADMIN_CHAT_ID:  ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
+        run: python futures.py
