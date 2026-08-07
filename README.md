@@ -38,7 +38,7 @@ Ayrıca **"25 Temmuz saat 09:00'da bana BTC durumunu mail at"** gibi zamanlı g�
 
 ## 📉 Futures sinyalleri — 8 saatte bir teknik analiz (yeni)
 
-`futures.py` 8 saatte bir (günde 3 kez) BTC/ETH/XRP/BNB için Binance Futures'tan **gerçek** OHLC mum verisi çekip giriş/stop-loss/hedef seviyelerini hesaplar ve **sadece sana özelden** (kanala değil) gönderir.
+`futures.py` 8 saatte bir (günde 3 kez) BTC/ETH/XRP/BNB için CoinGecko'dan **gerçek** OHLC mum verisi (otomatik ~4 saatlik mumlar) çekip giriş/stop-loss/hedef seviyelerini hesaplar ve **sadece sana özelden** (kanala değil) gönderir.
 
 - **Sayılar uydurulmaz:** yön (LONG/SHORT), ATR(14) ve EMA20/EMA50 trend hesabı **saf Python'da** yapılır; net bir trend yoksa o coin için "sinyal atlandı" der, zorla sinyal üretmez. Claude sadece WebSearch ile güncel haberin teknik yönle uyumlu olup olmadığına dair 1 satırlık kısa bir gerekçe ekler — sayısal seviyeleri değiştiremez.
 - **Risk yönetimi:** Stop-loss, iki mesafeden **küçük olanı** kullanır — (a) ATR bazlı teknik mesafe, (b) sermayenin en fazla **%10**'unu riske atacak mesafe (varsayılan **3x kaldıraç**). Yani hangi durumda olursa olsun, stop'a takılırsan sermaye kaybın asla %10'u aşmaz; ATR daha geniş bir stop öneriyorsa mesaj bunu ayrıca belirtir ("sermaye limiti bağlayıcı" notu).
@@ -166,7 +166,7 @@ Saati değiştirmek için workflow'daki `DELIVER_AT_TR` değerini (ve istersen c
 .
 ├── report.py            # Ana akış: veri → rapor → kart + brief + ses + detay gönderimi
 ├── asistan.py           # Soru-cevap asistanı: admin sorularını Claude ile cevaplar, zamanlı mail görevlerini ve fiyat alarmlarını yönetir
-├── futures.py           # Futures sinyalleri (8 saatte bir): Binance'tan gerçek mum verisi + ATR/EMA hesabı
+├── futures.py           # Futures sinyalleri (8 saatte bir): CoinGecko'dan gerçek mum verisi + ATR/EMA hesabı
 ├── kart.py              # Paylaşılabilir sabah kartı (Pillow)
 ├── ses.py               # 45 sn sesli özet (edge-tts + ffmpeg)
 ├── setup.py             # Kurulum sihirbazı (chat_id, test, .env, GitHub)
