@@ -7,7 +7,9 @@
       "yon": "uzerinde",
       "hedef_fiyat": 50000.0,
       "olusturulma_zamani": "2026-08-07T16:47:45.838664+03:00",
-      "durum": "aktif"
+      "durum": "tetiklendi",
+      "tetiklenme_zamani": "2026-08-07T16:48:17.699313+03:00",
+      "tetiklenme_fiyati": 65263
     }
   ]
 }
