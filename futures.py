@@ -1,15 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Futures Sinyalleri — Saatlik Teknik Analiz
-=============================================
+Futures Sinyalleri — 8 Saatte Bir Teknik Analiz
+==================================================
 
-Her saat, BTC/ETH/XRP/BNB için Binance Futures'tan gerçek OHLC mum verisi
-çekip ATR ve EMA20/EMA50 trendini SAF PYTHON ile hesaplar (LLM'e sayı
-uydurtulmaz — proje genelindeki ilke burada da geçerli). Giriş, stop-loss ve
-hedef seviyeleri bu hesaplardan üretilir. Claude'a sadece kısa bir "neden"
+8 saatte bir, BTC/ETH/XRP/BNB için CoinGecko'dan gerçek OHLC mum verisi
+çekip ATR ve EMA trendini SAF PYTHON ile hesaplar (LLM'e sayı uydurtulmaz —
+proje genelindeki ilke burada da geçerli). Giriş, stop-loss ve hedef
+seviyeleri bu hesaplardan üretilir. Claude'a sadece kısa bir "neden"
 gerekçesi yazdırılır (WebSearch ile güncel haber/gelişme kontrolü); Claude
 sayısal seviyeleri DEĞİŞTİREMEZ.
+
+NOT — Binance Futures yerine CoinGecko: İlk sürüm Binance Futures API'sini
+(fapi.binance.com) kullanıyordu, ancak GitHub Actions runner'ları ABD merkezli
+olduğu için Binance bunları coğrafi kısıtlama ile reddediyor (HTTP 451).
+CoinGecko'nun ücretsiz OHLC uç noktası (`/coins/{id}/ohlc`) GitHub Actions'tan
+sorunsuz erişilebiliyor (report.py'nin geri kalanı zaten bunu kullanıyor) ve
+gerçek high/low/close içeriyor. Bu SPOT fiyat verisidir; BTC/ETH/XRP/BNB gibi
+büyük paritelerde spot ve perpetual futures fiyatları birbirine çok yakın
+seyrettiği için teknik yapı (trend/ATR/destek-direnç) açısından güvenilir bir
+vekildir, ama tam futures fiyatıyla birebir aynı olmayabilir.
 
 Risk yönetimi: stop-loss, iki mesafeden KÜÇÜK OLANI kullanır:
   1) ATR_CARPANI * ATR(14) — teknik olarak makul bir stop mesafesi
@@ -47,12 +57,14 @@ from report import (
 
 _env_yukle()
 
-# Binance Futures sembolü -> gösterim sembolü
-SEMBOLLER = {"BTCUSDT": "BTC", "ETHUSDT": "ETH", "XRPUSDT": "XRP", "BNBUSDT": "BNB"}
+# CoinGecko coin id -> gösterim sembolü (report.py'deki COINS ile aynı id'ler)
+COIN_IDLER = {"bitcoin": "BTC", "ethereum": "ETH", "ripple": "XRP", "binancecoin": "BNB"}
 
-MUM_ARALIGI = "1h"
-MUM_SAYISI = 100          # EMA50 + ATR(14) için yeterli geçmiş
-DESTEK_DIRENC_PENCERESI = 30  # son N mumda swing high/low
+GUN_SAYISI = 7             # CoinGecko OHLC: days=7 -> otomatik ~4 saatlik mumlar (~42 nokta)
+EMA_KISA = 9
+EMA_UZUN = 21
+ATR_PERIYODU = 14
+DESTEK_DIRENC_PENCERESI = 20  # son N mumda swing high/low
 
 MAX_SERMAYE_RISKI = 0.10  # sermayenin en fazla %10'u riske atılır
 KALDIRAC = 3               # varsayılan kaldıraç (kullanıcı onayladı)
@@ -76,7 +88,7 @@ Her coin için WebSearch ile SON birkaç saatteki gelişmeleri/haberleri kontrol
 # Saf hesaplama fonksiyonları — ağ GEREKTİRMEZ, test edilebilir
 # --------------------------------------------------------------------------- #
 
-def _atr_hesapla(mumlar, periyot=14):
+def _atr_hesapla(mumlar, periyot=ATR_PERIYODU):
     """mumlar: kronolojik sıralı [{"open","high","low","close"}, ...] listesi.
     True Range ortalamasını (ATR) döndürür."""
     if len(mumlar) < periyot + 1:
@@ -101,14 +113,14 @@ def _ema_hesapla(kapanislar, periyot):
 
 
 def _yon_belirle(kapanislar):
-    """Fiyat ve EMA20/EMA50 hizasına göre 'long', 'short' ya da net trend
+    """Fiyat ve EMA9/EMA21 hizasına göre 'long', 'short' ya da net trend
     yoksa None döndürür."""
-    ema20 = _ema_hesapla(kapanislar, 20)
-    ema50 = _ema_hesapla(kapanislar, 50)
+    ema_kisa = _ema_hesapla(kapanislar, EMA_KISA)
+    ema_uzun = _ema_hesapla(kapanislar, EMA_UZUN)
     fiyat = kapanislar[-1]
-    if fiyat > ema20 > ema50:
+    if fiyat > ema_kisa > ema_uzun:
         return "long"
-    if fiyat < ema20 < ema50:
+    if fiyat < ema_kisa < ema_uzun:
         return "short"
     return None
 
@@ -159,14 +171,15 @@ def _seviyeleri_hesapla(mumlar):
 
 
 # --------------------------------------------------------------------------- #
-# Ağ — Binance Futures'tan gerçek mum verisi
+# Ağ — CoinGecko'dan gerçek mum verisi
 # --------------------------------------------------------------------------- #
 
-def _mumlari_cek(sembol, aralik=MUM_ARALIGI, sayi=MUM_SAYISI):
-    """Binance Futures public API'sinden OHLC mum verisi çeker (API key gerekmez)."""
+def _mumlari_cek(coin_id, gun=GUN_SAYISI):
+    """CoinGecko OHLC uç noktasından mum verisi çeker (API key gerekmez).
+    days=7 -> CoinGecko'nun otomatik granülaritesiyle ~4 saatlik mumlar."""
     veri = _get_json(
-        "https://fapi.binance.com/fapi/v1/klines",
-        params={"symbol": sembol, "interval": aralik, "limit": sayi},
+        f"https://api.coingecko.com/api/v3/coins/{coin_id}/ohlc",
+        params={"vs_currency": "usd", "days": gun},
     )
     return [
         {"open": float(k[1]), "high": float(k[2]), "low": float(k[3]), "close": float(k[4])}
@@ -230,9 +243,9 @@ def main():
 
     try:
         coin_seviyeleri = {}
-        for binance_sembol, gosterim in SEMBOLLER.items():
+        for coin_id, gosterim in COIN_IDLER.items():
             print(f"[bilgi] {gosterim} mum verisi çekiliyor...", file=sys.stderr)
-            mumlar = _mumlari_cek(binance_sembol)
+            mumlar = _mumlari_cek(coin_id)
             coin_seviyeleri[gosterim] = _seviyeleri_hesapla(mumlar)
 
         print("[bilgi] Analiz gerekçesi üretiliyor (WebSearch)...", file=sys.stderr)
