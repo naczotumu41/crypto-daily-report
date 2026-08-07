@@ -91,6 +91,30 @@ class SeviyeHesabi(unittest.TestCase):
         self.assertGreater(s["stop"], s["giris"])
         self.assertLess(s["hedef"], s["giris"])
 
+    def test_hedef_direncle_sinirlanmiyor_tam_rr_hesabi_kullanilir(self):
+        # Yükselen trendde pencere içindeki en yüksek high ("direnç") giriş
+        # fiyatına çok yakın çıkar; hedef yine de TAM R:R mesafesinde olmalı
+        # (önceki hatalı davranışta direnç hedefi neredeyse sıfıra indiriyordu).
+        mumlar = _yukselen_mumlar(60, baslangic=50.0, adim=1.0, genlik=0.5)
+        s = futures._seviyeleri_hesapla(mumlar)
+        beklenen_hedef = s["giris"] + (s["giris"] - s["stop"]) * futures.RR_ORANI
+        self.assertAlmostEqual(s["hedef"], beklenen_hedef, delta=0.01)
+
+    def test_yol_ustunde_direnc_varsa_not_ekleniyor_ama_hedefi_degistirmiyor(self):
+        mumlar = _yukselen_mumlar(45, baslangic=50.0, adim=1.0, genlik=0.5)
+        s0 = futures._seviyeleri_hesapla(mumlar)
+        self.assertEqual(s0["yon"], "long")
+        self.assertIsNone(s0["yol_ustunde_seviye"])  # doğal veride direnç giriş altında kalıyor
+
+        # Giriş ile hedef arasına yapay bir direnç enjekte et (ATR penceresi
+        # dışında bir mumun high'ını değiştirerek — ATR/hedef etkilenmemeli).
+        orta_nokta = (s0["giris"] + s0["hedef"]) / 2
+        mumlar[-18]["high"] = orta_nokta
+        s = futures._seviyeleri_hesapla(mumlar)
+
+        self.assertEqual(s["yol_ustunde_seviye"], orta_nokta)
+        self.assertAlmostEqual(s["hedef"], s0["hedef"], delta=0.01)  # hedef SINIRLANMADI
+
     def test_sermaye_riski_max_siniri_asmaz(self):
         # Çok yüksek volatilite (geniş ATR) olsa bile sermaye riski
         # MAX_SERMAYE_RISKI'ni (yüzde olarak) aşmamalı.
@@ -130,12 +154,23 @@ class SinyalBlogu(unittest.TestCase):
 
     def test_long_sinyalde_beklenen_alanlar_var(self):
         s = {"yon": "long", "giris": 65000.0, "stop": 63000.0, "hedef": 69000.0,
-             "atr": 500.0, "sermaye_riski_yuzde": 9.2, "stop_sinirlandi": False}
+             "atr": 500.0, "sermaye_riski_yuzde": 9.2, "stop_sinirlandi": False,
+             "yol_ustunde_seviye": None}
         blok = futures._sinyal_blogu("BTC", s)
         self.assertIn("LONG", blok)
         self.assertIn("$65,000", blok)
         self.assertIn("$63,000", blok)
         self.assertIn("$69,000", blok)
+        self.assertNotIn("Yolda", blok)
+
+    def test_yol_ustunde_seviye_varsa_uyari_notu_eklenir(self):
+        s = {"yon": "long", "giris": 65000.0, "stop": 63000.0, "hedef": 69000.0,
+             "atr": 500.0, "sermaye_riski_yuzde": 9.2, "stop_sinirlandi": False,
+             "yol_ustunde_seviye": 67000.0}
+        blok = futures._sinyal_blogu("BTC", s)
+        self.assertIn("Yolda", blok)
+        self.assertIn("$67,000", blok)
+        self.assertIn("direnç", blok)
 
 
 if __name__ == "__main__":

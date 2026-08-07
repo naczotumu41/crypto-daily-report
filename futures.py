@@ -135,7 +135,9 @@ def _seviyeleri_hesapla(mumlar):
     """Kronolojik mum listesinden giriş/stop/hedef seviyelerini hesaplar.
     Dönen dict: yon (None ise net trend yok, diğer alanlar hesaplanmaz),
     giris, stop, hedef, atr, sermaye_riski_yuzde, stop_sinirlandi (bool:
-    ATR yerine sermaye risk sınırının bağlayıcı olup olmadığı)."""
+    ATR yerine sermaye risk sınırının bağlayıcı olup olmadığı),
+    yol_ustunde_seviye (hedefe giderken kırılması gereken destek/direnç
+    varsa fiyatı, yoksa None — hedefi KISITLAMAZ, sadece bilgi notudur)."""
     kapanislar = [m["close"] for m in mumlar]
     yon = _yon_belirle(kapanislar)
     if yon is None:
@@ -151,22 +153,25 @@ def _seviyeleri_hesapla(mumlar):
     destek, direnc = _destek_direnc(mumlar)
     hedef_mesafe = stop_mesafe * RR_ORANI
 
+    # NOT: Hedef, en yakın destek/direnç ile SINIRLANDIRILMAZ — bu daha önce
+    # R:R oranını neredeyse sıfıra indirebiliyordu (kısa pencerede direnç
+    # genelde çok yakın çıkıyor). Seviye varsa sadece bilgi notu olarak
+    # eklenir, kullanıcı kendi kararını verir.
     if yon == "long":
         stop = giris - stop_mesafe
         hedef = giris + hedef_mesafe
-        if direnc > giris:
-            hedef = min(hedef, direnc)
+        yol_ustunde_seviye = direnc if giris < direnc < hedef else None
     else:
         stop = giris + stop_mesafe
         hedef = giris - hedef_mesafe
-        if destek < giris:
-            hedef = max(hedef, destek)
+        yol_ustunde_seviye = destek if hedef < destek < giris else None
 
     sermaye_riski_yuzde = (stop_mesafe / giris) * KALDIRAC * 100
 
     return {
         "yon": yon, "giris": giris, "stop": stop, "hedef": hedef, "atr": atr,
         "sermaye_riski_yuzde": sermaye_riski_yuzde, "stop_sinirlandi": stop_sinirlandi,
+        "yol_ustunde_seviye": yol_ustunde_seviye,
     }
 
 
@@ -203,12 +208,16 @@ def _sinyal_blogu(sembol, s):
     risk_notu = (f"~%{s['sermaye_riski_yuzde']:.1f} sermaye riski @ {KALDIRAC}x kaldıraç"
                  + (" (sermaye limiti bağlayıcı — ATR daha geniş bir stop öneriyordu)"
                     if s["stop_sinirlandi"] else ""))
-    return (
+    satir = (
         f"<b>{sembol}</b> — {yon_metni}\n"
         f"Giriş: {_fiyat_bicimle(s['giris'])}\n"
         f"Stop: {_fiyat_bicimle(s['stop'])} ({risk_notu})\n"
         f"Hedef: {_fiyat_bicimle(s['hedef'])} (R:R 1:{RR_ORANI:g})"
     )
+    if s.get("yol_ustunde_seviye") is not None:
+        seviye_turu = "direnç" if s["yon"] == "long" else "destek"
+        satir += f"\n⚠️ Yolda {_fiyat_bicimle(s['yol_ustunde_seviye'])} {seviye_turu} seviyesi var, kırılması gerekebilir."
+    return satir
 
 
 def _analiz_uret(coin_seviyeleri):
