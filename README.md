@@ -36,15 +36,15 @@ Ayrıca **"25 Temmuz saat 09:00'da bana BTC durumunu mail at"** gibi zamanlı g�
 
 ---
 
-## 📉 Futures sinyalleri — saatlik teknik analiz (yeni)
+## 📉 Futures sinyalleri — 8 saatte bir teknik analiz (yeni)
 
-`futures.py` her saat BTC/ETH/XRP/BNB için Binance Futures'tan **gerçek** OHLC mum verisi çekip giriş/stop-loss/hedef seviyelerini hesaplar ve **sadece sana özelden** (kanala değil) gönderir.
+`futures.py` 8 saatte bir (günde 3 kez) BTC/ETH/XRP/BNB için Binance Futures'tan **gerçek** OHLC mum verisi çekip giriş/stop-loss/hedef seviyelerini hesaplar ve **sadece sana özelden** (kanala değil) gönderir.
 
 - **Sayılar uydurulmaz:** yön (LONG/SHORT), ATR(14) ve EMA20/EMA50 trend hesabı **saf Python'da** yapılır; net bir trend yoksa o coin için "sinyal atlandı" der, zorla sinyal üretmez. Claude sadece WebSearch ile güncel haberin teknik yönle uyumlu olup olmadığına dair 1 satırlık kısa bir gerekçe ekler — sayısal seviyeleri değiştiremez.
 - **Risk yönetimi:** Stop-loss, iki mesafeden **küçük olanı** kullanır — (a) ATR bazlı teknik mesafe, (b) sermayenin en fazla **%10**'unu riske atacak mesafe (varsayılan **3x kaldıraç**). Yani hangi durumda olursa olsun, stop'a takılırsan sermaye kaybın asla %10'u aşmaz; ATR daha geniş bir stop öneriyorsa mesaj bunu ayrıca belirtir ("sermaye limiti bağlayıcı" notu).
 - **Hedef (take-profit):** stop mesafesinin 2 katı (R:R 1:2), ama en yakın destek/direncin ötesine geçmez.
 - Sadece **admin**'e gider (`TELEGRAM_ADMIN_CHAT_ID`) — kanal takipçileri kaldıraçlı sinyal almaz.
-- `.github/workflows/futures.yml` saatte bir çalışır, **yeni secret gerekmez** (mevcut 3 token yeterli).
+- `.github/workflows/futures.yml` 8 saatte bir çalışır, **yeni secret gerekmez** (mevcut 3 token yeterli).
 - ⚠️ **Yatırım tavsiyesi değildir.** Kaldıraçlı işlemler yüksek risk taşır, sermayenizin tamamını kaybedebilirsiniz. Bu, gerçek zamanlı hesaplanmış teknik bir gösterge çıktısıdır — garanti değildir.
 
 ---
@@ -166,7 +166,7 @@ Saati değiştirmek için workflow'daki `DELIVER_AT_TR` değerini (ve istersen c
 .
 ├── report.py            # Ana akış: veri → rapor → kart + brief + ses + detay gönderimi
 ├── asistan.py           # Soru-cevap asistanı: admin sorularını Claude ile cevaplar, zamanlı mail görevlerini ve fiyat alarmlarını yönetir
-├── futures.py           # Saatlik futures sinyalleri: Binance'tan gerçek mum verisi + ATR/EMA hesabı
+├── futures.py           # Futures sinyalleri (8 saatte bir): Binance'tan gerçek mum verisi + ATR/EMA hesabı
 ├── kart.py              # Paylaşılabilir sabah kartı (Pillow)
 ├── ses.py               # 45 sn sesli özet (edge-tts + ffmpeg)
 ├── setup.py             # Kurulum sihirbazı (chat_id, test, .env, GitHub)
@@ -176,7 +176,7 @@ Saati değiştirmek için workflow'daki `DELIVER_AT_TR` değerini (ve istersen c
 ├── state/gorevler.json  # Zamanlı mail görevleri (bekliyor/gönderildi/hata) (otomatik oluşur)
 ├── state/hafiza.json    # Kullanıcı hakkında öğrenilen kalıcı notlar (otomatik oluşur)
 ├── state/alarmlar.json  # Fiyat alarmları (aktif/tetiklendi) (otomatik oluşur)
-├── .github/workflows/   # daily-report.yml (08:00 TSİ) + asistan.yml + futures.yml (saatlik) + tests.yml
+├── .github/workflows/   # daily-report.yml (08:00 TSİ) + asistan.yml + futures.yml (8 saatte bir) + tests.yml
 ├── CLAUDE.md            # Claude Code'un otomatik kurulum rehberi
 ├── test_report.py       # Birim testler
 ├── test_asistan.py      # Soru-cevap asistanı için birim testler
