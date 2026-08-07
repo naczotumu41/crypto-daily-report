@@ -19,7 +19,7 @@ Bu bir "otomatik rapor" değil. Uyandığında tam ihtiyacın olan bilgiyi — g
 
 ---
 
-## 💬 Soru-cevap asistanı + zamanlı mail (yeni)
+## 💬 Soru-cevap asistanı + zamanlı mail + fiyat alarmları (yeni)
 
 Günlük rapora ek olarak, bota **özelden** yazdığın sorulara da cevap verir: haberleri sorabilir, "bu kripto neden düştü/battı" diye sorabilir, genel piyasa sorularını sorabilirsin. Cevaplar Claude'un canlı web araması yaparak ürettiği metinlerdir; net bir alım/satım fiyat seviyesi istersen bunu şu an hesaplayamadığını söyler (uydurma sayı vermez) — bu, ayrıca geliştirilmekte olan bir sonraki özellik.
 
@@ -31,6 +31,8 @@ Ayrıca **"25 Temmuz saat 09:00'da bana BTC durumunu mail at"** gibi zamanlı g�
 - **Mail özelliği için 3 EK secret gerekir** (Gmail SMTP, tamamen ücretsiz) — aşağıdaki secret tablosuna bak. Bu 3'ü eklemezsen soru-cevap kısmı yine çalışır, sadece mail görevi verdiğinde hata bildirimi alırsın.
 
 **Ayrıca seni zamanla "tanır":** Her cevaptan sonra, hakkında öğrendiği kalıcı bir bilgi/tercih varsa (ör. hangi coin'lerle ilgilendiğin, risk toleransın, sevdiğin rapor üslubu) bunu `state/hafiza.json`'a sessizce kaydeder ve bir sonraki soruda bunu bağlam olarak kullanır — bu ekstra secret ya da kurulum gerektirmez, otomatik işler.
+
+**Fiyat alarmları:** **"BTC 68.000'i geçerse haber ver"** ya da **"ETH 3.000'in altına inerse söyle"** gibi yaz, bot onaylar ve arka planda izlemeye başlar. Bu kontrol Claude gerektirmez — sadece CoinGecko'dan anlık fiyat çeker — bu yüzden `.github/workflows/asistan.yml`'nin *her* çalıştırmasında (Claude Code hiç kurulmadan) kontrol edilir; alarm tetiklenince Telegram'dan anında bildirim gelir ve alarm otomatik kapanır (tek seferlik, tekrar tetiklenmez). `state/alarmlar.json`'da tutulur, ekstra secret gerekmez.
 
 ---
 
@@ -150,7 +152,7 @@ Saati değiştirmek için workflow'daki `DELIVER_AT_TR` değerini (ve istersen c
 ```
 .
 ├── report.py            # Ana akış: veri → rapor → kart + brief + ses + detay gönderimi
-├── asistan.py           # Soru-cevap asistanı: admin sorularını Claude ile cevaplar, zamanlı mail görevlerini yönetir
+├── asistan.py           # Soru-cevap asistanı: admin sorularını Claude ile cevaplar, zamanlı mail görevlerini ve fiyat alarmlarını yönetir
 ├── kart.py              # Paylaşılabilir sabah kartı (Pillow)
 ├── ses.py               # 45 sn sesli özet (edge-tts + ffmpeg)
 ├── setup.py             # Kurulum sihirbazı (chat_id, test, .env, GitHub)
@@ -159,6 +161,7 @@ Saati değiştirmek için workflow'daki `DELIVER_AT_TR` değerini (ve istersen c
 ├── state/asistan.json   # Soru-cevap asistanının son okuduğu mesaj (otomatik oluşur)
 ├── state/gorevler.json  # Zamanlı mail görevleri (bekliyor/gönderildi/hata) (otomatik oluşur)
 ├── state/hafiza.json    # Kullanıcı hakkında öğrenilen kalıcı notlar (otomatik oluşur)
+├── state/alarmlar.json  # Fiyat alarmları (aktif/tetiklendi) (otomatik oluşur)
 ├── .github/workflows/   # daily-report.yml (08:00 TSİ) + asistan.yml (5 dk'da bir) + tests.yml
 ├── CLAUDE.md            # Claude Code'un otomatik kurulum rehberi
 ├── test_report.py       # Birim testler

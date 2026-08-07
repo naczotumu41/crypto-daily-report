@@ -146,6 +146,110 @@ class HafizaKaydetme(unittest.TestCase):
         self.assertNotIn("not 0", self._yazilan)
 
 
+class AlarmAyiklama(unittest.TestCase):
+    def test_alarm_blogu_ayiklanir_ve_metinden_temizlenir(self):
+        ham = (
+            "Tamam, BTC $65,000 üzerine çıkınca haber vereceğim.\n"
+            "===ALARM===\n"
+            '{"coingecko_id": "bitcoin", "sembol": "BTC", "yon": "uzerinde", "hedef_fiyat": 65000}\n'
+            "===ALARM-SON==="
+        )
+        temiz, alarm = asistan._alarm_ayikla(ham)
+        self.assertEqual(temiz, "Tamam, BTC $65,000 üzerine çıkınca haber vereceğim.")
+        self.assertEqual(alarm["coingecko_id"], "bitcoin")
+        self.assertEqual(alarm["yon"], "uzerinde")
+        self.assertEqual(alarm["hedef_fiyat"], 65000)
+
+    def test_alarm_blogu_yoksa_none_doner(self):
+        temiz, alarm = asistan._alarm_ayikla("Sadece normal bir cevap.")
+        self.assertEqual(temiz, "Sadece normal bir cevap.")
+        self.assertIsNone(alarm)
+
+    def test_gecersiz_yon_yoksayilir(self):
+        ham = ('===ALARM===\n{"coingecko_id": "bitcoin", "yon": "yanlis", "hedef_fiyat": 100}\n'
+               "===ALARM-SON===")
+        _, alarm = asistan._alarm_ayikla(ham)
+        self.assertIsNone(alarm)
+
+    def test_negatif_hedef_fiyat_yoksayilir(self):
+        ham = ('===ALARM===\n{"coingecko_id": "bitcoin", "yon": "uzerinde", "hedef_fiyat": -5}\n'
+               "===ALARM-SON===")
+        _, alarm = asistan._alarm_ayikla(ham)
+        self.assertIsNone(alarm)
+
+    def test_eksik_alanli_alarm_yoksayilir(self):
+        ham = '===ALARM===\n{"coingecko_id": "bitcoin"}\n===ALARM-SON==='
+        _, alarm = asistan._alarm_ayikla(ham)
+        self.assertIsNone(alarm)
+
+
+class AlarmKontrolu(unittest.TestCase):
+    def setUp(self):
+        self._orig_oku = asistan._alarmlari_oku
+        self._orig_yaz = asistan._alarmlari_yaz
+        self._orig_fiyat = asistan._fiyatlari_cek
+        self._orig_gonder = asistan.telegram_gonder
+        self._gonderilenler = []
+        self._yazilan = None
+        asistan.telegram_gonder = lambda *a, **k: self._gonderilenler.append((a, k))
+
+    def tearDown(self):
+        asistan._alarmlari_oku = self._orig_oku
+        asistan._alarmlari_yaz = self._orig_yaz
+        asistan._fiyatlari_cek = self._orig_fiyat
+        asistan.telegram_gonder = self._orig_gonder
+
+    def test_hedef_ustunde_tetiklenir(self):
+        asistan._alarmlari_oku = lambda: [
+            {"coingecko_id": "bitcoin", "sembol": "BTC", "yon": "uzerinde",
+             "hedef_fiyat": 65000, "durum": "aktif"}
+        ]
+        asistan._fiyatlari_cek = lambda idler: {"bitcoin": 65500}
+        asistan._alarmlari_yaz = lambda alarmlar: setattr(self, "_yazilan", alarmlar)
+        asistan._alarmlari_kontrol_et_ve_bildir("token", "admin")
+        self.assertEqual(len(self._gonderilenler), 1)
+        self.assertEqual(self._yazilan[0]["durum"], "tetiklendi")
+
+    def test_hedefe_ulasmadiysa_tetiklenmez(self):
+        asistan._alarmlari_oku = lambda: [
+            {"coingecko_id": "bitcoin", "sembol": "BTC", "yon": "uzerinde",
+             "hedef_fiyat": 65000, "durum": "aktif"}
+        ]
+        asistan._fiyatlari_cek = lambda idler: {"bitcoin": 64000}
+        asistan._alarmlari_yaz = lambda alarmlar: setattr(self, "_yazilan", alarmlar)
+        asistan._alarmlari_kontrol_et_ve_bildir("token", "admin")
+        self.assertEqual(self._gonderilenler, [])
+        self.assertIsNone(self._yazilan)
+
+    def test_hedef_altinda_tetiklenir(self):
+        asistan._alarmlari_oku = lambda: [
+            {"coingecko_id": "ethereum", "sembol": "ETH", "yon": "altinda",
+             "hedef_fiyat": 3000, "durum": "aktif"}
+        ]
+        asistan._fiyatlari_cek = lambda idler: {"ethereum": 2900}
+        asistan._alarmlari_yaz = lambda alarmlar: setattr(self, "_yazilan", alarmlar)
+        asistan._alarmlari_kontrol_et_ve_bildir("token", "admin")
+        self.assertEqual(len(self._gonderilenler), 1)
+        self.assertEqual(self._yazilan[0]["durum"], "tetiklendi")
+
+    def test_tetiklenmis_alarm_tekrar_kontrol_edilmez(self):
+        asistan._alarmlari_oku = lambda: [
+            {"coingecko_id": "bitcoin", "sembol": "BTC", "yon": "uzerinde",
+             "hedef_fiyat": 65000, "durum": "tetiklendi"}
+        ]
+        asistan._fiyatlari_cek = lambda idler: (_ for _ in ()).throw(
+            AssertionError("aktif olmayan alarm için fiyat çekilmemeli"))
+        asistan._alarmlari_kontrol_et_ve_bildir("token", "admin")
+        self.assertEqual(self._gonderilenler, [])
+
+    def test_aktif_alarm_yoksa_fiyat_hic_cekilmez(self):
+        asistan._alarmlari_oku = lambda: []
+        asistan._fiyatlari_cek = lambda idler: (_ for _ in ()).throw(
+            AssertionError("alarm yokken fiyat çekilmemeli"))
+        asistan._alarmlari_kontrol_et_ve_bildir("token", "admin")
+        self.assertEqual(self._gonderilenler, [])
+
+
 class HedefZamanAyristirma(unittest.TestCase):
     def test_ofsetli_zaman_aynen_kullanilir(self):
         hz = asistan._hedef_zamani_ayristir("2026-07-25T14:00:00+03:00")
