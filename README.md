@@ -21,7 +21,7 @@ Bu bir "otomatik rapor" değil. Uyandığında tam ihtiyacın olan bilgiyi — g
 
 ## 💬 Soru-cevap asistanı + zamanlı mail + fiyat alarmları (yeni)
 
-Günlük rapora ek olarak, bota **özelden** yazdığın sorulara da cevap verir: haberleri sorabilir, "bu kripto neden düştü/battı" diye sorabilir, genel piyasa sorularını sorabilirsin. Cevaplar Claude'un canlı web araması yaparak ürettiği metinlerdir; net bir alım/satım fiyat seviyesi istersen bunu şu an hesaplayamadığını söyler (uydurma sayı vermez) — bu, ayrıca geliştirilmekte olan bir sonraki özellik.
+Günlük rapora ek olarak, bota **özelden** yazdığın sorulara da cevap verir: haberleri sorabilir, "bu kripto neden düştü/battı" diye sorabilir, genel piyasa sorularını sorabilirsin. Cevaplar Claude'un canlı web araması yaparak ürettiği metinlerdir; net bir alım/satım fiyat seviyesi istersen bu soru-cevap kısmı şu an hesaplayamadığını söyler (uydurma sayı vermez) — bunun için aşağıdaki ayrı **Futures sinyalleri** özelliğine bak.
 
 Ayrıca **"25 Temmuz saat 09:00'da bana BTC durumunu mail at"** gibi zamanlı görevler verebilirsin: bot "tamam, o saatte göndereceğim" diye onaylar, tam vaktinde (en fazla ~5 dk gecikmeyle) o anki güncel bilgiyle bir mail hazırlayıp gönderir ve Telegram'dan "mail gönderildi" diye haber verir. Görev tek seferliktir (tekrarlayan/periyodik görev desteklenmiyor).
 
@@ -33,6 +33,19 @@ Ayrıca **"25 Temmuz saat 09:00'da bana BTC durumunu mail at"** gibi zamanlı g�
 **Ayrıca seni zamanla "tanır":** Her cevaptan sonra, hakkında öğrendiği kalıcı bir bilgi/tercih varsa (ör. hangi coin'lerle ilgilendiğin, risk toleransın, sevdiğin rapor üslubu) bunu `state/hafiza.json`'a sessizce kaydeder ve bir sonraki soruda bunu bağlam olarak kullanır — bu ekstra secret ya da kurulum gerektirmez, otomatik işler.
 
 **Fiyat alarmları:** **"BTC 68.000'i geçerse haber ver"** ya da **"ETH 3.000'in altına inerse söyle"** gibi yaz, bot onaylar ve arka planda izlemeye başlar. Bu kontrol Claude gerektirmez — sadece CoinGecko'dan anlık fiyat çeker — bu yüzden `.github/workflows/asistan.yml`'nin *her* çalıştırmasında (Claude Code hiç kurulmadan) kontrol edilir; alarm tetiklenince Telegram'dan anında bildirim gelir ve alarm otomatik kapanır (tek seferlik, tekrar tetiklenmez). `state/alarmlar.json`'da tutulur, ekstra secret gerekmez.
+
+---
+
+## 📉 Futures sinyalleri — saatlik teknik analiz (yeni)
+
+`futures.py` her saat BTC/ETH/XRP/BNB için Binance Futures'tan **gerçek** OHLC mum verisi çekip giriş/stop-loss/hedef seviyelerini hesaplar ve **sadece sana özelden** (kanala değil) gönderir.
+
+- **Sayılar uydurulmaz:** yön (LONG/SHORT), ATR(14) ve EMA20/EMA50 trend hesabı **saf Python'da** yapılır; net bir trend yoksa o coin için "sinyal atlandı" der, zorla sinyal üretmez. Claude sadece WebSearch ile güncel haberin teknik yönle uyumlu olup olmadığına dair 1 satırlık kısa bir gerekçe ekler — sayısal seviyeleri değiştiremez.
+- **Risk yönetimi:** Stop-loss, iki mesafeden **küçük olanı** kullanır — (a) ATR bazlı teknik mesafe, (b) sermayenin en fazla **%10**'unu riske atacak mesafe (varsayılan **3x kaldıraç**). Yani hangi durumda olursa olsun, stop'a takılırsan sermaye kaybın asla %10'u aşmaz; ATR daha geniş bir stop öneriyorsa mesaj bunu ayrıca belirtir ("sermaye limiti bağlayıcı" notu).
+- **Hedef (take-profit):** stop mesafesinin 2 katı (R:R 1:2), ama en yakın destek/direncin ötesine geçmez.
+- Sadece **admin**'e gider (`TELEGRAM_ADMIN_CHAT_ID`) — kanal takipçileri kaldıraçlı sinyal almaz.
+- `.github/workflows/futures.yml` saatte bir çalışır, **yeni secret gerekmez** (mevcut 3 token yeterli).
+- ⚠️ **Yatırım tavsiyesi değildir.** Kaldıraçlı işlemler yüksek risk taşır, sermayenizin tamamını kaybedebilirsiniz. Bu, gerçek zamanlı hesaplanmış teknik bir gösterge çıktısıdır — garanti değildir.
 
 ---
 
@@ -153,6 +166,7 @@ Saati değiştirmek için workflow'daki `DELIVER_AT_TR` değerini (ve istersen c
 .
 ├── report.py            # Ana akış: veri → rapor → kart + brief + ses + detay gönderimi
 ├── asistan.py           # Soru-cevap asistanı: admin sorularını Claude ile cevaplar, zamanlı mail görevlerini ve fiyat alarmlarını yönetir
+├── futures.py           # Saatlik futures sinyalleri: Binance'tan gerçek mum verisi + ATR/EMA hesabı
 ├── kart.py              # Paylaşılabilir sabah kartı (Pillow)
 ├── ses.py               # 45 sn sesli özet (edge-tts + ffmpeg)
 ├── setup.py             # Kurulum sihirbazı (chat_id, test, .env, GitHub)
@@ -162,10 +176,11 @@ Saati değiştirmek için workflow'daki `DELIVER_AT_TR` değerini (ve istersen c
 ├── state/gorevler.json  # Zamanlı mail görevleri (bekliyor/gönderildi/hata) (otomatik oluşur)
 ├── state/hafiza.json    # Kullanıcı hakkında öğrenilen kalıcı notlar (otomatik oluşur)
 ├── state/alarmlar.json  # Fiyat alarmları (aktif/tetiklendi) (otomatik oluşur)
-├── .github/workflows/   # daily-report.yml (08:00 TSİ) + asistan.yml (5 dk'da bir) + tests.yml
+├── .github/workflows/   # daily-report.yml (08:00 TSİ) + asistan.yml + futures.yml (saatlik) + tests.yml
 ├── CLAUDE.md            # Claude Code'un otomatik kurulum rehberi
 ├── test_report.py       # Birim testler
 ├── test_asistan.py      # Soru-cevap asistanı için birim testler
+├── test_futures.py      # Futures sinyalleri için birim testler
 ├── LICENSE              # MIT
 └── .env.example
 ```
