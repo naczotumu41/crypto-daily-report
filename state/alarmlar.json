@@ -1,0 +1,13 @@
+{
+  "alarmlar": [
+    {
+      "id": "5aad30dd",
+      "coingecko_id": "bitcoin",
+      "sembol": "BTC",
+      "yon": "uzerinde",
+      "hedef_fiyat": 50000.0,
+      "olusturulma_zamani": "2026-08-07T16:47:45.838664+03:00",
+      "durum": "aktif"
+    }
+  ]
+}
