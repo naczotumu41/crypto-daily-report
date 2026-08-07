@@ -1,17 +1,17 @@
-name: Futures Sinyalleri (Saatlik)
+name: Futures Sinyalleri (8 Saatte Bir)
 
-# BTC/ETH/XRP/BNB için saatte bir Binance Futures'tan gerçek mum verisiyle
+# BTC/ETH/XRP/BNB için 8 saatte bir Binance Futures'tan gerçek mum verisiyle
 # teknik seviye (giriş/stop/hedef) hesaplayıp SADECE admin'e Telegram'dan
 # gönderir. Sayılar Python'da hesaplanır (LLM'e uydurtulmaz); Claude sadece
 # kısa bir WebSearch destekli gerekçe ekler.
 #
 # NOT: GitHub'ın kendi cron zamanlayıcısı bu repo için güvenilmez bulundu
 # (bkz. proje notları / asistan.yml). Asıl tetikleme dışarıdan cron-job.org
-# ile saatte bir workflow_dispatch çağrılarak yapılıyor. Aşağıdaki `schedule`
-# sadece best-effort bir yedek.
+# ile 8 saatte bir workflow_dispatch çağrılarak yapılıyor. Aşağıdaki
+# `schedule` sadece best-effort bir yedek.
 on:
   schedule:
-    - cron: "0 * * * *"
+    - cron: "0 */8 * * *"
   workflow_dispatch:
 
 concurrency:
