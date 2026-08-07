@@ -1,10 +1,17 @@
-name: Kripto Asistan (Soru-Cevap + Zamanlı Mail)
+name: Kripto Asistan (Soru-Cevap + Zamanlı Mail + Fiyat Alarmları)
 
-# Admin Telegram'da bota özelden yazdığında birkaç dakika içinde cevap versin
-# ve "şu gün şu saatte mail at" görevleri zamanında gitsin diye her 5 dakikada
-# bir "yeni mesaj / vadesi gelmiş görev var mı" diye bakar. Claude Code CLI
-# kurulumu (yavaş adım) SADECE gerçekten işlenecek bir şey varsa çalışır —
-# boşuna her 5 dakikada bir kurulum yapıp Actions dakikası harcamamak için.
+# Admin Telegram'da bota özelden yazdığında birkaç dakika içinde cevap versin,
+# "şu gün şu saatte mail at" görevleri zamanında gitsin ve fiyat alarmları
+# ("BTC 65000'i geçerse haber ver") anında tetiklensin diye her çalıştırmada
+# "kontrol" job'ı bakar. Claude Code CLI kurulumu (yavaş adım) SADECE
+# gerçekten cevaplanacak bir mesaj/gönderilecek mail varsa çalışır — fiyat
+# alarmı kontrolü Claude gerektirmediği için HER ZAMAN "kontrol" job'ının
+# ucuz tarafında (CoinGecko + Telegram) yapılır.
+#
+# NOT: GitHub'ın kendi cron zamanlayıcısı bu repo için güvenilmez bulundu
+# (bkz. proje notları) — asıl tetikleme dışarıdan cron-job.org ile her birkaç
+# dakikada bir workflow_dispatch çağrılarak yapılıyor. Aşağıdaki `schedule`
+# sadece best-effort bir yedek.
 on:
   schedule:
     - cron: "*/5 * * * *"
@@ -17,11 +24,15 @@ concurrency:
 jobs:
   kontrol:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       mesaj_var: ${{ steps.kontrol.outputs.mesaj_var }}
     steps:
       - name: Repoyu çek
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Python 3.11 kur
         uses: actions/setup-python@v5
@@ -31,12 +42,25 @@ jobs:
       - name: Python bağımlılıklarını kur
         run: pip install -r requirements.txt
 
-      - name: Yeni mesaj / vadesi gelmiş görev var mı bak (Claude'a dokunmadan)
+      - name: Yeni mesaj / vadesi gelmiş görev var mı bak + fiyat alarmlarını kontrol et (Claude'a dokunmadan)
         id: kontrol
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_ADMIN_CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
         run: python asistan.py --kontrol
+
+      - name: Durumu kaydet (tetiklenen alarmlar)
+        run: |
+          if [ -f state/alarmlar.json ] && [ -n "$(git status --porcelain state/alarmlar.json 2>/dev/null)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add state/alarmlar.json
+            git commit -m "chore: alarm durumu"
+            git pull --rebase --autostash origin main || true
+            git push || echo "push basarisiz (best-effort)"
+          else
+            echo "alarm durumu degismedi"
+          fi
 
   cevapla:
     needs: kontrol
@@ -79,7 +103,7 @@ jobs:
       - name: Durumu kaydet
         run: |
           degisti=false
-          for f in state/asistan.json state/gorevler.json state/hafiza.json; do
+          for f in state/asistan.json state/gorevler.json state/hafiza.json state/alarmlar.json; do
             if [ -f "$f" ] && [ -n "$(git status --porcelain "$f" 2>/dev/null)" ]; then
               git add "$f"
               degisti=true
