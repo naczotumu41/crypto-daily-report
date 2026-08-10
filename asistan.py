@@ -23,6 +23,12 @@ diyebilirsin — her iki durumda da aktif liste (id'leriyle) Claude'a bağlam
 olarak veriliyor; iptal isteğinde Claude doğru id'yi seçip gizli bir
 ===IPTAL=== bloğu üretiyor, sistem o öğeyi "iptal_edildi" işaretliyor.
 
+Portföyüne "0.5 BTC'm var" gibi miktar ekleyebilir/güncelleyebilirsin
+(state/portfoy.json). "Portföyüm ne durumda" dediğinde Claude cevap YAZMAZ
+(===PORTFOY_SORGU=== işareti üretir) — sistem CoinGecko'dan canlı fiyat
+çekip toplam değeri + 24s değişimi Python'da hesaplar, uydurma sayı riski
+olmasın diye.
+
 Kullanım:
   python asistan.py --kontrol   Yanıt bekleyen admin mesajı YA DA vadesi gelmiş
                                  mail görevi var mı bakar (Claude'a DOKUNMAZ,
@@ -76,11 +82,12 @@ STATE_YOL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "state", "a
 GOREVLER_YOL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "state", "gorevler.json")
 HAFIZA_YOL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "state", "hafiza.json")
 ALARMLAR_YOL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "state", "alarmlar.json")
+PORTFOY_YOL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "state", "portfoy.json")
 HAFIZA_UST_SINIR = 200  # notlar bunu aşarsa en eskiler düşürülür
 
 # SORU PROMPTU — admin'in tek bir mesajına verilecek cevabı üretmek için
-# headless Claude Code'a verilir. {soru}, {simdi}, {hafiza} ve {aktif_ozet}
-# çalışma anında doldurulur.
+# headless Claude Code'a verilir. {soru}, {simdi}, {hafiza}, {aktif_ozet} ve
+# {portfoy} çalışma anında doldurulur.
 SORU_PROMPTU = """Sen Telegram'da çalışan bir kripto/piyasa asistanısın. Kullanıcı (botun sahibi) sana özel olarak aşağıdaki mesajı yazdı.
 
 BUGÜNÜN TARİHİ VE SAATİ (TSİ): {simdi}
@@ -90,6 +97,9 @@ KULLANICI HAKKINDA BİLDİKLERİN (varsa, cevabını buna göre kişiselleştir)
 
 AKTİF ALARMLARIN VE BEKLEYEN GÖREVLERİN (id'ler dahil — 'listele' sorularında ve 'iptal et' isteklerinde bunu kullan):
 {aktif_ozet}
+
+PORTFÖYÜNDEKİ VARLIKLARIN (miktar; CANLI DEĞER YOK — güncel değer sorulursa DURUM F'yi kullan):
+{portfoy}
 
 KULLANICININ MESAJI:
 {soru}
@@ -124,6 +134,22 @@ DURUM D — Kullanıcı senden bir ALARMI ya da GÖREVİ (bekleyen maili) İPTAL
      Bu durumda NORMAL cevap yazma, SADECE onay cümlesi + iptal bloğunu yaz.
   3. Eşleştiremezsen (liste boş, ya da hangi öğe belli değilse): İPTAL bloğu YAZMA, DURUM B gibi kullanıcıdan netleştirme iste.
 
+DURUM E — Kullanıcı PORTFÖYÜNE bir varlık ekliyor/güncelliyor/çıkarıyor (ör. "0.5 BTC'm var", "portföyüme 2 ETH ekle", "3000 HYPE aldım", "tüm SOL'umu sattım"):
+  1. Kullanıcıya TEK CÜMLELİK kısa bir onay yaz (ör. "Tamam, portföyüne 0.5 BTC kaydettim.").
+  2. Onay cümlesinin hemen altına, TAM bu formatta bir portföy bloğu ekle (Telegram'a GİTMEYECEK):
+===PORTFOY===
+{{"coingecko_id": "coingecko.com'daki DOĞRU api id'si", "sembol": "gösterim sembolü", "miktar": sayı (pozitif), "islem": "belirle" veya "ekle" veya "cikar"}}
+===PORTFOY-SON===
+  - "X kadar Y'im var / toplam Z" derse islem="belirle" (mevcut miktarı bu sayıya EŞİTLE).
+  - "aldım / ekle" derse islem="ekle" (mevcut miktara EKLE).
+  - "sattım / çıkar" derse islem="cikar" (mevcut miktardan DÜŞ); "hepsini/tamamını sattım" gibi miktar belirtilmeyen durumlarda, yukarıdaki PORTFÖYÜNDEKİ VARLIKLARIN listesindeki mevcut miktarı miktar alanına yaz.
+  - Bu durumda NORMAL cevap yazma, SADECE onay cümlesi + portföy bloğunu yaz.
+
+DURUM F — Kullanıcı portföyünün GÜNCEL DEĞERİNİ/DURUMUNU soruyor (ör. "portföyüm ne durumda", "portföy değerim ne kadar", "ne kadar kazandım"):
+  NORMAL cevap YAZMA (canlı fiyata erişimin yok, uydurma sayı verme yasak). SADECE tam bu iki satırı yaz, başka HİÇBİR ŞEY ekleme:
+===PORTFOY_SORGU===
+===PORTFOY_SORGU-SON===
+
 DURUM B — Diğer her şey (soru, haber talebi, "neden düştü/battı" gibi açıklama istekleri, aktif alarm/görevleri LİSTELEME istekleri, genel sohbet):
   Doğrudan cevap ver. Soru güncel bir olayla ilgiliyse WebSearch ile son gelişmeleri araştır; yalnızca doğruladığın bilgiyi yaz, uydurma, önemli iddialarda kaynak belirt. Kullanıcı aktif alarm/görevlerini sorarsa (ör. "alarmlarım neler", "bekleyen görevlerim var mı"), yukarıdaki AKTİF ALARMLARIN VE BEKLEYEN GÖREVLERİN bilgisini düzenli bir liste halinde sun (id'leri gösterme, sadece sembol/hedef/zaman gibi anlamlı bilgiyi).
 
@@ -138,7 +164,7 @@ DURUM B — Diğer her şey (soru, haber talebi, "neden düştü/battı" gibi a�
   - Finansal görüş/yorum içeren cevapların sonuna kısaca "Yatırım tavsiyesi
     değildir." ekle.
 
-GENEL KURAL — HAFIZA GÜNCELLEME (DURUM A/B/C/D fark etmez):
+GENEL KURAL — HAFIZA GÜNCELLEME (DURUM A/B/C/D/E/F fark etmez):
 Bu mesajdan kullanıcı hakkında YENİ ve KALICI bir bilgi/tercih öğrendiysen
 (ör. hangi coin'lerle ilgilendiği, risk toleransı, hangi tür raporu/üslubu
 sevdiği, tekrar eden istekleri), cevabının/görev bloğunun ALTINA ayrı bir
@@ -302,6 +328,32 @@ def _iptal_ayikla(cevap):
     return temiz, iptal
 
 
+def _portfoy_ayikla(cevap):
+    """Claude'un ham cevabından ===PORTFOY===...===PORTFOY-SON=== bloğunu ayıklar.
+    (temiz_cevap, islem_dict_or_None) döndürür."""
+    m = re.search(r"===PORTFOY===\s*(.*?)\s*===PORTFOY-SON===", cevap, re.S)
+    islem = None
+    if m:
+        try:
+            v = json.loads(m.group(1).strip())
+            if (isinstance(v, dict) and v.get("coingecko_id")
+                    and v.get("islem") in ("belirle", "ekle", "cikar")
+                    and isinstance(v.get("miktar"), (int, float)) and v["miktar"] >= 0):
+                islem = v
+        except ValueError:
+            islem = None
+    temiz = re.sub(r"===PORTFOY===.*?===PORTFOY-SON===", "", cevap, flags=re.S).strip()
+    return temiz, islem
+
+
+def _portfoy_sorgu_ayikla(cevap):
+    """===PORTFOY_SORGU===...===PORTFOY_SORGU-SON=== bloğunun varlığını
+    kontrol eder. (temiz_cevap, sorgulandi_mi) döndürür."""
+    sorgulandi = bool(re.search(r"===PORTFOY_SORGU===", cevap))
+    temiz = re.sub(r"===PORTFOY_SORGU===.*?===PORTFOY_SORGU-SON===", "", cevap, flags=re.S).strip()
+    return temiz, sorgulandi
+
+
 # --------------------------------------------------------------------------- #
 # Hafıza (kullanıcı hakkında kalıcı notlar) yönetimi
 # --------------------------------------------------------------------------- #
@@ -438,6 +490,104 @@ def _alarmlari_kontrol_et_ve_bildir(bot_token, admin_id):
         _alarmlari_yaz(alarmlar)
 
 
+# --------------------------------------------------------------------------- #
+# Portföy takibi (miktar bazlı, canlı değer sorgusu Python'da hesaplanır)
+# --------------------------------------------------------------------------- #
+
+def _portfoyu_oku():
+    try:
+        with open(PORTFOY_YOL, encoding="utf-8") as f:
+            v = json.load(f).get("varliklar", [])
+        return v if isinstance(v, list) else []
+    except (FileNotFoundError, ValueError, OSError):
+        return []
+
+
+def _portfoyu_yaz(varliklar):
+    os.makedirs(os.path.dirname(PORTFOY_YOL), exist_ok=True)
+    with open(PORTFOY_YOL, "w", encoding="utf-8") as f:
+        json.dump({"varliklar": varliklar}, f, ensure_ascii=False, indent=2)
+
+
+def _portfoy_baglam_metni():
+    """Portföy içeriğini (canlı fiyat OLMADAN) Claude'a bağlam olarak
+    verilecek kısa bir metin halinde özetler."""
+    varliklar = _portfoyu_oku()
+    if not varliklar:
+        return "Portföyünde henüz kayıtlı varlık yok."
+    return "\n".join(f"- {v.get('sembol')}: {v.get('miktar')}" for v in varliklar)
+
+
+def _portfoy_islemini_uygula(islem):
+    """Bir PORTFOY işlemini (belirle/ekle/cikar) uygular ve kaydeder.
+    Sonuç miktar 0 ya da altına inerse varlık listeden tamamen kaldırılır
+    (tamamı satılmış demektir). Yeni miktarı döndürür."""
+    varliklar = _portfoyu_oku()
+    cid = str(islem["coingecko_id"]).strip()
+    sembol = str(islem.get("sembol") or cid).strip()
+    miktar = float(islem["miktar"])
+
+    mevcut = next((v for v in varliklar if v.get("coingecko_id") == cid), None)
+    mevcut_miktar = mevcut["miktar"] if mevcut else 0.0
+    if islem["islem"] == "belirle":
+        yeni_miktar = miktar
+    elif islem["islem"] == "ekle":
+        yeni_miktar = mevcut_miktar + miktar
+    else:  # "cikar"
+        yeni_miktar = mevcut_miktar - miktar
+
+    if mevcut:
+        varliklar.remove(mevcut)
+    if yeni_miktar > 0:
+        varliklar.append({"coingecko_id": cid, "sembol": sembol, "miktar": yeni_miktar})
+    _portfoyu_yaz(varliklar)
+    return yeni_miktar
+
+
+def _portfoy_ozeti_olustur():
+    """Portföydeki varlıkların CANLI fiyatlarını çekip toplam değeri ve 24s
+    değişimi hesaplar. Sayılar CoinGecko'dan gelir, Claude'a hiç sorulmaz."""
+    varliklar = _portfoyu_oku()
+    if not varliklar:
+        return ("Portföyünde henüz kayıtlı bir varlık yok. \"0.5 BTC'm var\" gibi "
+                "yazarak ekleyebilirsin.")
+
+    idler = [v["coingecko_id"] for v in varliklar]
+    try:
+        veri = _get_json(
+            "https://api.coingecko.com/api/v3/simple/price",
+            params={"ids": ",".join(sorted(set(idler))), "vs_currencies": "usd",
+                    "include_24hr_change": "true"},
+        )
+    except Exception as e:                                # noqa: BLE001
+        return f"⚠️ Portföy değeri hesaplanamadı: {html.escape(str(e)[:200])}"
+
+    satirlar = []
+    toplam_deger = 0.0
+    toplam_24s_onceki = 0.0
+    for v in varliklar:
+        d = veri.get(v["coingecko_id"])
+        if not d or "usd" not in d:
+            satirlar.append(f"{v['sembol']}: fiyat alınamadı")
+            continue
+        fiyat = d["usd"]
+        degisim = d.get("usd_24h_change")
+        deger = v["miktar"] * fiyat
+        toplam_deger += deger
+        toplam_24s_onceki += deger / (1 + degisim / 100) if degisim is not None else deger
+        degisim_str = f"{degisim:+.1f}%" if degisim is not None else "n/a"
+        satirlar.append(f"{v['sembol']}: {v['miktar']:g} × {_fiyat_bicimle(fiyat)} = "
+                        f"{_fiyat_bicimle(deger)} ({degisim_str} 24s)")
+
+    toplam_degisim_str = ""
+    if toplam_24s_onceki > 0:
+        toplam_degisim_yuzde = (toplam_deger - toplam_24s_onceki) / toplam_24s_onceki * 100
+        toplam_degisim_str = f" ({toplam_degisim_yuzde:+.1f}% 24s)"
+
+    return ("💼 <b>Portföyün</b>\n" + "\n".join(satirlar)
+            + f"\n\n<b>Toplam: {_fiyat_bicimle(toplam_deger)}</b>{toplam_degisim_str}")
+
+
 def _hedef_zamani_ayristir(deger):
     """ISO 8601 zaman damgasını ayrıştırır; saat dilimi yoksa TSİ varsayar."""
     hz = datetime.fromisoformat(str(deger))
@@ -572,14 +722,17 @@ def cevapla(bot_token, admin_id):
             notlar = _hafizayi_oku()
             hafiza_str = "\n".join(f"- {n}" for n in notlar) if notlar else "Henüz bir şey kaydedilmedi."
             aktif_ozet = _aktif_ozet_olustur()
+            portfoy_str = _portfoy_baglam_metni()
             try:
                 ham = _claude_calistir(
                     SORU_PROMPTU.format(soru=soru, simdi=simdi_str, hafiza=hafiza_str,
-                                        aktif_ozet=aktif_ozet),
+                                        aktif_ozet=aktif_ozet, portfoy=portfoy_str),
                     min_uzunluk=10)
                 cevap, gorev = _gorev_ayikla(ham)
                 cevap, alarm = _alarm_ayikla(cevap)
                 cevap, iptal = _iptal_ayikla(cevap)
+                cevap, portfoy_islem = _portfoy_ayikla(cevap)
+                cevap, portfoy_sorgu = _portfoy_sorgu_ayikla(cevap)
                 cevap, yeni_notlar = _hafiza_notlarini_ayikla(cevap)
                 if yeni_notlar:
                     print(f"[bilgi] Hafızaya {len(yeni_notlar)} yeni not eklendi.", file=sys.stderr)
@@ -589,6 +742,17 @@ def cevapla(bot_token, admin_id):
                 gorev = None
                 alarm = None
                 iptal = None
+                portfoy_islem = None
+                portfoy_sorgu = False
+
+            if portfoy_sorgu:
+                print("[bilgi] Portföy değeri sorgulandı, canlı hesaplanıyor...", file=sys.stderr)
+                cevap = _portfoy_ozeti_olustur()
+
+            if portfoy_islem:
+                yeni_miktar = _portfoy_islemini_uygula(portfoy_islem)
+                etiket = portfoy_islem.get("sembol") or portfoy_islem["coingecko_id"]
+                print(f"[bilgi] Portföy güncellendi: {etiket} -> {yeni_miktar}", file=sys.stderr)
 
             if iptal:
                 bulundu = False
