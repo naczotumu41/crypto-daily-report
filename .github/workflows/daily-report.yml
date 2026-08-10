@@ -89,14 +89,34 @@ jobs:
 
       - name: Takip durumunu kaydet
         if: ${{ inputs.mode != 'test' && inputs.mode != 'onizleme' }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ADMIN_CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
         run: |
           if [ -n "$(git status --porcelain state/takip.json 2>/dev/null)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add state/takip.json
             git commit -m "chore: gunluk takip durumu"
-            git pull --rebase --autostash origin main || true
-            git push || echo "push basarisiz (best-effort; rapor gonderildi)"
+            basarili=false
+            for deneme in 1 2 3 4 5; do
+              git rebase --abort >/dev/null 2>&1 || true
+              if git pull --rebase --autostash origin main && git push; then
+                basarili=true
+                break
+              fi
+              echo "[uyarı] Push denemesi $deneme/5 başarısız, tekrar deneniyor..."
+              git rebase --abort >/dev/null 2>&1 || true
+              sleep $((deneme * 4))
+            done
+            if [ "$basarili" != true ]; then
+              echo "::error::Takip durumu 5 denemede de push edilemedi (rapor yine de gönderildi) — nöbetçi koruması bozulmuş olabilir, aynı gün ikinci bir rapor gidebilir!"
+              curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+                -d "chat_id=${TELEGRAM_ADMIN_CHAT_ID}" \
+                -d "text=⚠️ Günlük rapor gönderildi ama takip durumu GitHub'a kaydedilemedi. Nöbetçi koruması bozulmuş olabilir, bugün ikinci bir rapor gidebilir." \
+                >/dev/null || true
+              exit 1
+            fi
           else
             echo "takip degismedi"
           fi
