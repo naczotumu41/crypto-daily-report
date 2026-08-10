@@ -311,6 +311,113 @@ class AktifOzetOlusturma(unittest.TestCase):
         self.assertNotIn("id=g2", ozet)
 
 
+class PortfoyAyiklama(unittest.TestCase):
+    def test_portfoy_blogu_ayiklanir_ve_metinden_temizlenir(self):
+        ham = (
+            "Tamam, portföyüne 0.5 BTC kaydettim.\n"
+            "===PORTFOY===\n"
+            '{"coingecko_id": "bitcoin", "sembol": "BTC", "miktar": 0.5, "islem": "belirle"}\n'
+            "===PORTFOY-SON==="
+        )
+        temiz, islem = asistan._portfoy_ayikla(ham)
+        self.assertEqual(temiz, "Tamam, portföyüne 0.5 BTC kaydettim.")
+        self.assertEqual(islem["coingecko_id"], "bitcoin")
+        self.assertEqual(islem["islem"], "belirle")
+        self.assertEqual(islem["miktar"], 0.5)
+
+    def test_portfoy_blogu_yoksa_none_doner(self):
+        temiz, islem = asistan._portfoy_ayikla("Sadece normal bir cevap.")
+        self.assertEqual(temiz, "Sadece normal bir cevap.")
+        self.assertIsNone(islem)
+
+    def test_gecersiz_islem_yoksayilir(self):
+        ham = ('===PORTFOY===\n{"coingecko_id": "bitcoin", "islem": "yanlis", "miktar": 1}\n'
+               "===PORTFOY-SON===")
+        _, islem = asistan._portfoy_ayikla(ham)
+        self.assertIsNone(islem)
+
+    def test_negatif_miktar_yoksayilir(self):
+        ham = ('===PORTFOY===\n{"coingecko_id": "bitcoin", "islem": "ekle", "miktar": -1}\n'
+               "===PORTFOY-SON===")
+        _, islem = asistan._portfoy_ayikla(ham)
+        self.assertIsNone(islem)
+
+    def test_portfoy_sorgu_blogu_algilanir_ve_temizlenir(self):
+        ham = "===PORTFOY_SORGU===\n===PORTFOY_SORGU-SON==="
+        temiz, sorgulandi = asistan._portfoy_sorgu_ayikla(ham)
+        self.assertEqual(temiz, "")
+        self.assertTrue(sorgulandi)
+
+    def test_portfoy_sorgu_yoksa_false_doner(self):
+        temiz, sorgulandi = asistan._portfoy_sorgu_ayikla("Sadece normal bir cevap.")
+        self.assertEqual(temiz, "Sadece normal bir cevap.")
+        self.assertFalse(sorgulandi)
+
+
+class PortfoyIslemUygulama(unittest.TestCase):
+    def setUp(self):
+        self._orig_oku = asistan._portfoyu_oku
+        self._orig_yaz = asistan._portfoyu_yaz
+        self._yazilan = None
+
+    def tearDown(self):
+        asistan._portfoyu_oku = self._orig_oku
+        asistan._portfoyu_yaz = self._orig_yaz
+
+    def test_belirle_yeni_varlik_ekler(self):
+        asistan._portfoyu_oku = lambda: []
+        asistan._portfoyu_yaz = lambda v: setattr(self, "_yazilan", v)
+        sonuc = asistan._portfoy_islemini_uygula(
+            {"coingecko_id": "bitcoin", "sembol": "BTC", "miktar": 0.5, "islem": "belirle"})
+        self.assertEqual(sonuc, 0.5)
+        self.assertEqual(self._yazilan, [{"coingecko_id": "bitcoin", "sembol": "BTC", "miktar": 0.5}])
+
+    def test_belirle_mevcut_varligin_ustune_yazar(self):
+        asistan._portfoyu_oku = lambda: [{"coingecko_id": "bitcoin", "sembol": "BTC", "miktar": 1.0}]
+        asistan._portfoyu_yaz = lambda v: setattr(self, "_yazilan", v)
+        asistan._portfoy_islemini_uygula(
+            {"coingecko_id": "bitcoin", "sembol": "BTC", "miktar": 2.0, "islem": "belirle"})
+        self.assertEqual(self._yazilan, [{"coingecko_id": "bitcoin", "sembol": "BTC", "miktar": 2.0}])
+
+    def test_ekle_mevcut_miktara_ekler(self):
+        asistan._portfoyu_oku = lambda: [{"coingecko_id": "bitcoin", "sembol": "BTC", "miktar": 1.0}]
+        asistan._portfoyu_yaz = lambda v: setattr(self, "_yazilan", v)
+        sonuc = asistan._portfoy_islemini_uygula(
+            {"coingecko_id": "bitcoin", "sembol": "BTC", "miktar": 0.5, "islem": "ekle"})
+        self.assertEqual(sonuc, 1.5)
+
+    def test_cikar_miktardan_duser(self):
+        asistan._portfoyu_oku = lambda: [{"coingecko_id": "bitcoin", "sembol": "BTC", "miktar": 1.0}]
+        asistan._portfoyu_yaz = lambda v: setattr(self, "_yazilan", v)
+        sonuc = asistan._portfoy_islemini_uygula(
+            {"coingecko_id": "bitcoin", "sembol": "BTC", "miktar": 0.4, "islem": "cikar"})
+        self.assertEqual(sonuc, 0.6)
+
+    def test_cikar_tamamini_satinca_varlik_kaldirilir(self):
+        asistan._portfoyu_oku = lambda: [{"coingecko_id": "bitcoin", "sembol": "BTC", "miktar": 1.0}]
+        asistan._portfoyu_yaz = lambda v: setattr(self, "_yazilan", v)
+        sonuc = asistan._portfoy_islemini_uygula(
+            {"coingecko_id": "bitcoin", "sembol": "BTC", "miktar": 1.0, "islem": "cikar"})
+        self.assertEqual(sonuc, 0)
+        self.assertEqual(self._yazilan, [])
+
+
+class PortfoyBaglamMetni(unittest.TestCase):
+    def setUp(self):
+        self._orig_oku = asistan._portfoyu_oku
+
+    def tearDown(self):
+        asistan._portfoyu_oku = self._orig_oku
+
+    def test_bos_portfoyde_bilgi_mesaji(self):
+        asistan._portfoyu_oku = lambda: []
+        self.assertEqual(asistan._portfoy_baglam_metni(), "Portföyünde henüz kayıtlı varlık yok.")
+
+    def test_varliklar_listelenir(self):
+        asistan._portfoyu_oku = lambda: [{"coingecko_id": "bitcoin", "sembol": "BTC", "miktar": 0.5}]
+        self.assertIn("BTC: 0.5", asistan._portfoy_baglam_metni())
+
+
 class HedefZamanAyristirma(unittest.TestCase):
     def test_ofsetli_zaman_aynen_kullanilir(self):
         hz = asistan._hedef_zamani_ayristir("2026-07-25T14:00:00+03:00")

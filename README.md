@@ -36,6 +36,8 @@ Ayrıca **"25 Temmuz saat 09:00'da bana BTC durumunu mail at"** gibi zamanlı g�
 
 **Listeleme ve iptal:** **"alarmlarım neler"** / **"bekleyen görevlerim var mı"** diye sorabilir, **"BTC alarmını iptal et"** ya da **"yarınki maili iptal et"** diyebilirsin. Aktif alarm/görev listesi (id'leriyle) her soruda Claude'a bağlam olarak verilir; iptal isteğinde doğru öğeyi bulup "iptal_edildi" işaretler.
 
+**Portföy takibi:** **"0.5 BTC'm var"**, **"portföyüme 2 ETH ekle"** ya da **"tüm SOL'umu sattım"** gibi yaz — miktar `state/portfoy.json`'a kaydedilir. **"Portföyüm ne durumda"** diye sorduğunda ise Claude cevap YAZMAZ; sistem CoinGecko'dan canlı fiyatları çekip her varlığın güncel değerini + 24 saatlik değişimini + toplamı **Python'da hesaplayıp** gönderir (uydurma sayı riski olmasın diye).
+
 ---
 
 ## 📉 Futures sinyalleri — 8 saatte bir teknik analiz (yeni)
@@ -178,6 +180,7 @@ Saati değiştirmek için workflow'daki `DELIVER_AT_TR` değerini (ve istersen c
 ├── state/gorevler.json  # Zamanlı mail görevleri (bekliyor/gönderildi/hata) (otomatik oluşur)
 ├── state/hafiza.json    # Kullanıcı hakkında öğrenilen kalıcı notlar (otomatik oluşur)
 ├── state/alarmlar.json  # Fiyat alarmları (aktif/tetiklendi) (otomatik oluşur)
+├── state/portfoy.json   # Portföydeki varlıklar (coin + miktar) (otomatik oluşur)
 ├── .github/workflows/   # daily-report.yml (08:00 TSİ) + asistan.yml + futures.yml (8 saatte bir) + tests.yml
 ├── CLAUDE.md            # Claude Code'un otomatik kurulum rehberi
 ├── test_report.py       # Birim testler
