@@ -18,6 +18,11 @@ coin'ler, risk toleransı, tercih ettiği üslup vb.) state/hafiza.json'a
 biriktirilir ve bir sonraki soruda tekrar Claude'a bağlam olarak verilir —
 böylece asistan zamanla kullanıcıyı "tanır".
 
+Aktif alarm/görevlerini "listele" diye sorabilir ya da birini "iptal et"
+diyebilirsin — her iki durumda da aktif liste (id'leriyle) Claude'a bağlam
+olarak veriliyor; iptal isteğinde Claude doğru id'yi seçip gizli bir
+===IPTAL=== bloğu üretiyor, sistem o öğeyi "iptal_edildi" işaretliyor.
+
 Kullanım:
   python asistan.py --kontrol   Yanıt bekleyen admin mesajı YA DA vadesi gelmiş
                                  mail görevi var mı bakar (Claude'a DOKUNMAZ,
@@ -74,13 +79,17 @@ ALARMLAR_YOL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "state",
 HAFIZA_UST_SINIR = 200  # notlar bunu aşarsa en eskiler düşürülür
 
 # SORU PROMPTU — admin'in tek bir mesajına verilecek cevabı üretmek için
-# headless Claude Code'a verilir. {soru}, {simdi} ve {hafiza} çalışma anında doldurulur.
+# headless Claude Code'a verilir. {soru}, {simdi}, {hafiza} ve {aktif_ozet}
+# çalışma anında doldurulur.
 SORU_PROMPTU = """Sen Telegram'da çalışan bir kripto/piyasa asistanısın. Kullanıcı (botun sahibi) sana özel olarak aşağıdaki mesajı yazdı.
 
 BUGÜNÜN TARİHİ VE SAATİ (TSİ): {simdi}
 
 KULLANICI HAKKINDA BİLDİKLERİN (varsa, cevabını buna göre kişiselleştir):
 {hafiza}
+
+AKTİF ALARMLARIN VE BEKLEYEN GÖREVLERİN (id'ler dahil — 'listele' sorularında ve 'iptal et' isteklerinde bunu kullan):
+{aktif_ozet}
 
 KULLANICININ MESAJI:
 {soru}
@@ -106,8 +115,17 @@ DURUM C — Kullanıcı senden bir FİYAT ALARMI kurmanı istiyor (ör. "BTC 650
   - coingecko_id'yi mümkün olduğunca doğru ver; emin değilsen en olası CoinGecko id'sini kullan.
   - Bu durumda NORMAL cevap yazma, SADECE onay cümlesi + alarm bloğunu yaz.
 
-DURUM B — Diğer her şey (soru, haber talebi, "neden düştü/battı" gibi açıklama istekleri, genel sohbet):
-  Doğrudan cevap ver. Soru güncel bir olayla ilgiliyse WebSearch ile son gelişmeleri araştır; yalnızca doğruladığın bilgiyi yaz, uydurma, önemli iddialarda kaynak belirt.
+DURUM D — Kullanıcı senden bir ALARMI ya da GÖREVİ (bekleyen maili) İPTAL etmeni istiyor (ör. "BTC alarmını iptal et", "yarınki maili iptal et"):
+  1. Yukarıdaki AKTİF ALARMLARIN VE BEKLEYEN GÖREVLERİN listesinden hangi öğeyi kastettiğini (sembol/açıklamaya göre) bul.
+  2. Net şekilde eşleştirebilirsen: kullanıcıya TEK CÜMLELİK kısa bir onay yaz (ör. "Tamam, BTC alarmını iptal ettim."), hemen altına TAM bu formatta bir iptal bloğu ekle (Telegram'a GİTMEYECEK):
+===IPTAL===
+{{"tur": "alarm" veya "gorev", "id": "listeden AYNEN kopyaladığın id"}}
+===IPTAL-SON===
+     Bu durumda NORMAL cevap yazma, SADECE onay cümlesi + iptal bloğunu yaz.
+  3. Eşleştiremezsen (liste boş, ya da hangi öğe belli değilse): İPTAL bloğu YAZMA, DURUM B gibi kullanıcıdan netleştirme iste.
+
+DURUM B — Diğer her şey (soru, haber talebi, "neden düştü/battı" gibi açıklama istekleri, aktif alarm/görevleri LİSTELEME istekleri, genel sohbet):
+  Doğrudan cevap ver. Soru güncel bir olayla ilgiliyse WebSearch ile son gelişmeleri araştır; yalnızca doğruladığın bilgiyi yaz, uydurma, önemli iddialarda kaynak belirt. Kullanıcı aktif alarm/görevlerini sorarsa (ör. "alarmlarım neler", "bekleyen görevlerim var mı"), yukarıdaki AKTİF ALARMLARIN VE BEKLEYEN GÖREVLERİN bilgisini düzenli bir liste halinde sun (id'leri gösterme, sadece sembol/hedef/zaman gibi anlamlı bilgiyi).
 
   ÇIKTI KURALLARI (DURUM B için):
   - Telegram HTML kullan (<b>, <i>, <a href="">); markdown/tablo KULLANMA.
@@ -120,7 +138,7 @@ DURUM B — Diğer her şey (soru, haber talebi, "neden düştü/battı" gibi a�
   - Finansal görüş/yorum içeren cevapların sonuna kısaca "Yatırım tavsiyesi
     değildir." ekle.
 
-GENEL KURAL — HAFIZA GÜNCELLEME (DURUM A/B/C fark etmez):
+GENEL KURAL — HAFIZA GÜNCELLEME (DURUM A/B/C/D fark etmez):
 Bu mesajdan kullanıcı hakkında YENİ ve KALICI bir bilgi/tercih öğrendiysen
 (ör. hangi coin'lerle ilgilendiği, risk toleransı, hangi tür raporu/üslubu
 sevdiği, tekrar eden istekleri), cevabının/görev bloğunun ALTINA ayrı bir
@@ -268,6 +286,22 @@ def _alarm_ayikla(cevap):
     return temiz, alarm
 
 
+def _iptal_ayikla(cevap):
+    """Claude'un ham cevabından ===IPTAL===...===IPTAL-SON=== bloğunu ayıklar.
+    (temiz_cevap, iptal_dict_or_None) döndürür."""
+    m = re.search(r"===IPTAL===\s*(.*?)\s*===IPTAL-SON===", cevap, re.S)
+    iptal = None
+    if m:
+        try:
+            v = json.loads(m.group(1).strip())
+            if isinstance(v, dict) and v.get("tur") in ("alarm", "gorev") and v.get("id"):
+                iptal = v
+        except ValueError:
+            iptal = None
+    temiz = re.sub(r"===IPTAL===.*?===IPTAL-SON===", "", cevap, flags=re.S).strip()
+    return temiz, iptal
+
+
 # --------------------------------------------------------------------------- #
 # Hafıza (kullanıcı hakkında kalıcı notlar) yönetimi
 # --------------------------------------------------------------------------- #
@@ -334,6 +368,30 @@ def _fiyatlari_cek(coingecko_idler):
         params={"ids": ",".join(sorted(set(coingecko_idler))), "vs_currencies": "usd"},
     )
     return {cid: d["usd"] for cid, d in veri.items() if isinstance(d, dict) and "usd" in d}
+
+
+def _aktif_ozet_olustur():
+    """Aktif alarm ve bekleyen görevleri, Claude'a bağlam olarak verilecek
+    kısa bir metin halinde özetler (id'ler dahil — 'listele'/'iptal et'
+    isteklerinde kullanılır)."""
+    alarmlar = [a for a in _alarmlari_oku() if a.get("durum") == "aktif"]
+    gorevler = [g for g in _gorevleri_oku() if g.get("durum") == "bekliyor"]
+    if not alarmlar and not gorevler:
+        return "Şu an aktif alarm veya bekleyen görev yok."
+
+    satirlar = []
+    for a in alarmlar:
+        yon_tr = "üzerine çıkarsa" if a.get("yon") == "uzerinde" else "altına inerse"
+        satirlar.append(
+            f"- [ALARM id={a.get('id')}] {a.get('sembol')} "
+            f"{_fiyat_bicimle(a.get('hedef_fiyat', 0))} {yon_tr}"
+        )
+    for g in gorevler:
+        satirlar.append(
+            f"- [GOREV id={g.get('id')}] {g.get('hedef_zaman')} — "
+            f"{str(g.get('icerik_talebi', ''))[:80]}"
+        )
+    return "\n".join(satirlar)
 
 
 def _alarmlari_kontrol_et_ve_bildir(bot_token, admin_id):
@@ -513,12 +571,15 @@ def cevapla(bot_token, admin_id):
             print(f"[bilgi] Soru cevaplanıyor: {soru[:80]!r}", file=sys.stderr)
             notlar = _hafizayi_oku()
             hafiza_str = "\n".join(f"- {n}" for n in notlar) if notlar else "Henüz bir şey kaydedilmedi."
+            aktif_ozet = _aktif_ozet_olustur()
             try:
                 ham = _claude_calistir(
-                    SORU_PROMPTU.format(soru=soru, simdi=simdi_str, hafiza=hafiza_str),
+                    SORU_PROMPTU.format(soru=soru, simdi=simdi_str, hafiza=hafiza_str,
+                                        aktif_ozet=aktif_ozet),
                     min_uzunluk=10)
                 cevap, gorev = _gorev_ayikla(ham)
                 cevap, alarm = _alarm_ayikla(cevap)
+                cevap, iptal = _iptal_ayikla(cevap)
                 cevap, yeni_notlar = _hafiza_notlarini_ayikla(cevap)
                 if yeni_notlar:
                     print(f"[bilgi] Hafızaya {len(yeni_notlar)} yeni not eklendi.", file=sys.stderr)
@@ -527,6 +588,34 @@ def cevapla(bot_token, admin_id):
                 cevap = f"⚠️ Bu soruyu cevaplarken bir hata oluştu: {html.escape(str(e)[:300])}"
                 gorev = None
                 alarm = None
+                iptal = None
+
+            if iptal:
+                bulundu = False
+                if iptal["tur"] == "alarm":
+                    alarmlar = _alarmlari_oku()
+                    for a in alarmlar:
+                        if a.get("id") == iptal["id"] and a.get("durum") == "aktif":
+                            a["durum"] = "iptal_edildi"
+                            bulundu = True
+                            break
+                    if bulundu:
+                        _alarmlari_yaz(alarmlar)
+                else:
+                    gorevler = _gorevleri_oku()
+                    for g in gorevler:
+                        if g.get("id") == iptal["id"] and g.get("durum") == "bekliyor":
+                            g["durum"] = "iptal_edildi"
+                            bulundu = True
+                            break
+                    if bulundu:
+                        _gorevleri_yaz(gorevler)
+                if bulundu:
+                    print(f"[bilgi] İptal edildi: {iptal}", file=sys.stderr)
+                else:
+                    print(f"[uyarı] İptal edilecek öğe bulunamadı: {iptal}", file=sys.stderr)
+                    cevap += ("\n\n⚠️ Bu öğeyi bulamadım, zaten iptal edilmiş ya da "
+                              "tetiklenmiş/gönderilmiş olabilir.")
 
             if alarm:
                 alarmlar = _alarmlari_oku()

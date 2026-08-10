@@ -250,6 +250,67 @@ class AlarmKontrolu(unittest.TestCase):
         self.assertEqual(self._gonderilenler, [])
 
 
+class IptalAyiklama(unittest.TestCase):
+    def test_iptal_blogu_ayiklanir_ve_metinden_temizlenir(self):
+        ham = (
+            "Tamam, BTC alarmını iptal ettim.\n"
+            "===IPTAL===\n"
+            '{"tur": "alarm", "id": "a1b2c3d4"}\n'
+            "===IPTAL-SON==="
+        )
+        temiz, iptal = asistan._iptal_ayikla(ham)
+        self.assertEqual(temiz, "Tamam, BTC alarmını iptal ettim.")
+        self.assertEqual(iptal["tur"], "alarm")
+        self.assertEqual(iptal["id"], "a1b2c3d4")
+
+    def test_iptal_blogu_yoksa_none_doner(self):
+        temiz, iptal = asistan._iptal_ayikla("Sadece normal bir cevap.")
+        self.assertEqual(temiz, "Sadece normal bir cevap.")
+        self.assertIsNone(iptal)
+
+    def test_gecersiz_tur_yoksayilir(self):
+        ham = '===IPTAL===\n{"tur": "baska_bir_sey", "id": "x"}\n===IPTAL-SON==='
+        _, iptal = asistan._iptal_ayikla(ham)
+        self.assertIsNone(iptal)
+
+    def test_id_eksikse_yoksayilir(self):
+        ham = '===IPTAL===\n{"tur": "gorev"}\n===IPTAL-SON==='
+        _, iptal = asistan._iptal_ayikla(ham)
+        self.assertIsNone(iptal)
+
+
+class AktifOzetOlusturma(unittest.TestCase):
+    def setUp(self):
+        self._orig_alarm_oku = asistan._alarmlari_oku
+        self._orig_gorev_oku = asistan._gorevleri_oku
+
+    def tearDown(self):
+        asistan._alarmlari_oku = self._orig_alarm_oku
+        asistan._gorevleri_oku = self._orig_gorev_oku
+
+    def test_hicbir_sey_yoksa_bilgi_mesaji(self):
+        asistan._alarmlari_oku = lambda: []
+        asistan._gorevleri_oku = lambda: []
+        self.assertEqual(asistan._aktif_ozet_olustur(), "Şu an aktif alarm veya bekleyen görev yok.")
+
+    def test_sadece_aktif_ve_bekleyenler_listelenir(self):
+        asistan._alarmlari_oku = lambda: [
+            {"id": "a1", "sembol": "BTC", "yon": "uzerinde", "hedef_fiyat": 65000, "durum": "aktif"},
+            {"id": "a2", "sembol": "ETH", "yon": "altinda", "hedef_fiyat": 3000, "durum": "tetiklendi"},
+        ]
+        asistan._gorevleri_oku = lambda: [
+            {"id": "g1", "hedef_zaman": "2026-07-25T09:00:00+03:00",
+             "icerik_talebi": "BTC özeti", "durum": "bekliyor"},
+            {"id": "g2", "hedef_zaman": "2026-07-20T09:00:00+03:00",
+             "icerik_talebi": "eski görev", "durum": "gonderildi"},
+        ]
+        ozet = asistan._aktif_ozet_olustur()
+        self.assertIn("id=a1", ozet)
+        self.assertIn("id=g1", ozet)
+        self.assertNotIn("id=a2", ozet)
+        self.assertNotIn("id=g2", ozet)
+
+
 class HedefZamanAyristirma(unittest.TestCase):
     def test_ofsetli_zaman_aynen_kullanilir(self):
         hz = asistan._hedef_zamani_ayristir("2026-07-25T14:00:00+03:00")

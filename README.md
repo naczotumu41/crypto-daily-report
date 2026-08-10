@@ -34,6 +34,8 @@ Ayrıca **"25 Temmuz saat 09:00'da bana BTC durumunu mail at"** gibi zamanlı g�
 
 **Fiyat alarmları:** **"BTC 68.000'i geçerse haber ver"** ya da **"ETH 3.000'in altına inerse söyle"** gibi yaz, bot onaylar ve arka planda izlemeye başlar. Bu kontrol Claude gerektirmez — sadece CoinGecko'dan anlık fiyat çeker — bu yüzden `.github/workflows/asistan.yml`'nin *her* çalıştırmasında (Claude Code hiç kurulmadan) kontrol edilir; alarm tetiklenince Telegram'dan anında bildirim gelir ve alarm otomatik kapanır (tek seferlik, tekrar tetiklenmez). `state/alarmlar.json`'da tutulur, ekstra secret gerekmez.
 
+**Listeleme ve iptal:** **"alarmlarım neler"** / **"bekleyen görevlerim var mı"** diye sorabilir, **"BTC alarmını iptal et"** ya da **"yarınki maili iptal et"** diyebilirsin. Aktif alarm/görev listesi (id'leriyle) her soruda Claude'a bağlam olarak verilir; iptal isteğinde doğru öğeyi bulup "iptal_edildi" işaretler.
+
 ---
 
 ## 📉 Futures sinyalleri — 8 saatte bir teknik analiz (yeni)
