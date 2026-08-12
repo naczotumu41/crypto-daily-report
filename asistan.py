@@ -42,12 +42,23 @@ Kullanım:
                                  ilerletir, ARDINDAN vadesi gelmiş mail
                                  görevlerini üretip gönderir.
 
-Yalnızca TELEGRAM_ADMIN_CHAT_ID'den gelen mesajlar cevaplanır — kanaldaki ya
-da botla konuşan başka biri Claude aboneliğini/mail kotasını tüketmesin diye.
+Yalnızca TELEGRAM_ADMIN_CHAT_ID VE (varsa) TELEGRAM_GRUP_CHAT_ID'den gelen
+mesajlar cevaplanır — botla konuşan rastgele biri Claude aboneliğini/mail
+kotasını tüketmesin diye. Grup üyeleri de admin ile TAMAMEN AYNI yetkilere
+sahiptir (alarm/mail/portföy dahil); paylaşılan TEK bir state üzerinde
+çalışılır. Cevaplar, sorunun geldiği sohbete (admin özel ya da grup) gider.
+
+Kullanım (ek):
+  python asistan.py --sohbetleri-listele   Son güncellemelerdeki tüm
+                                 sohbetleri (chat_id, tür, başlık) yazdırır;
+                                 state'e DOKUNMAZ. Grubun chat_id'sini bulmak
+                                 için kurulumda BİR KEZ kullanılır — önce
+                                 gruba bir mesaj at, sonra bunu çalıştır.
 
 Ortam değişkenleri:
   Mevcut (report.py ile paylaşılır): CLAUDE_CODE_OAUTH_TOKEN,
     TELEGRAM_BOT_TOKEN, TELEGRAM_ADMIN_CHAT_ID
+  Grup desteği için YENİ (opsiyonel): TELEGRAM_GRUP_CHAT_ID
   Mail özelliği için YENİ (Gmail SMTP, uygulama şifresi ile — ücretsiz):
     SMTP_GMAIL_ADRES, SMTP_UYGULAMA_SIFRESI, ALICI_EMAIL
 """
@@ -88,7 +99,7 @@ HAFIZA_UST_SINIR = 200  # notlar bunu aşarsa en eskiler düşürülür
 # SORU PROMPTU — admin'in tek bir mesajına verilecek cevabı üretmek için
 # headless Claude Code'a verilir. {soru}, {simdi}, {hafiza}, {aktif_ozet} ve
 # {portfoy} çalışma anında doldurulur.
-SORU_PROMPTU = """Sen Telegram'da çalışan bir kripto/piyasa asistanısın. Kullanıcı (botun sahibi) sana özel olarak aşağıdaki mesajı yazdı.
+SORU_PROMPTU = """Sen Telegram'da çalışan bir kripto/piyasa asistanısın. Kullanıcı (botun sahibi ya da güvendiği grubundaki biri — ikisi de aynı yetkiye sahip) sana aşağıdaki mesajı yazdı.
 
 BUGÜNÜN TARİHİ VE SAATİ (TSİ): {simdi}
 
@@ -219,11 +230,13 @@ def _guncellemeleri_al(bot_token, offset):
     return veri.get("result", [])
 
 
-def _admin_mesajlarini_ayikla(guncellemeler, admin_id):
-    """Güncellemeler arasından admin'in metin mesajlarını çıkarır.
-    (admin_mesajlari, en_buyuk_update_id) döndürür — ikincisi None ise hiç
-    güncelleme yok demektir."""
-    admin_id = str(admin_id)
+def _yetkili_mesajlari_ayikla(guncellemeler, yetkili_id_seti):
+    """Güncellemeler arasından yetkili sohbetlerden (admin ve varsa grup)
+    gelen metin mesajlarını çıkarır. ((chat_id, metin) çiftleri listesi,
+    en_buyuk_update_id) döndürür — ikincisi None ise hiç güncelleme yok
+    demektir. son_id, yetkisiz sohbetlerden gelenler dahil TÜM güncellemeler
+    üzerinden hesaplanır (offset doğru ilerlesin diye)."""
+    yetkili_id_seti = {str(x) for x in yetkili_id_seti}
     mesajlar = []
     son_id = None
     for g in guncellemeler:
@@ -231,9 +244,40 @@ def _admin_mesajlarini_ayikla(guncellemeler, admin_id):
         msg = g.get("message") or {}
         metin = msg.get("text")
         chat_id = str((msg.get("chat") or {}).get("id", ""))
-        if metin and chat_id == admin_id:
-            mesajlar.append(metin)
+        if metin and chat_id in yetkili_id_seti:
+            mesajlar.append((chat_id, metin))
     return mesajlar, son_id
+
+
+def sohbetleri_listele(bot_token):
+    """Son güncellemelerdeki TÜM sohbetleri (id, tür, başlık, son mesaj)
+    yazdırır; state'e dokunmaz, offset'i İLERLETMEZ. Kurulumda grup
+    chat_id'sini bulmak için kullanılır."""
+    durum = _durum_oku()
+    ud = durum.get("son_update_id")
+    guncellemeler = _guncellemeleri_al(bot_token, ud + 1 if ud else None)
+    if not guncellemeler:
+        print("[bilgi] Yeni güncelleme yok. Önce gruba (ya da bota özelden) bir mesaj at, "
+              "sonra tekrar çalıştır.", file=sys.stderr)
+        return
+    gorulen = {}
+    for g in guncellemeler:
+        msg = g.get("message") or {}
+        chat = msg.get("chat") or {}
+        cid = chat.get("id")
+        if cid is None:
+            continue
+        gorulen[cid] = {
+            "tur": chat.get("type"),
+            "baslik": chat.get("title") or chat.get("username") or chat.get("first_name") or "",
+            "son_mesaj": (msg.get("text") or "")[:50],
+        }
+    if not gorulen:
+        print("[bilgi] Güncellemeler var ama içlerinde okunabilir bir sohbet yok.", file=sys.stderr)
+        return
+    for cid, bilgi in gorulen.items():
+        print(f"chat_id={cid}  tur={bilgi['tur']}  baslik={bilgi['baslik']!r}  "
+              f"son_mesaj={bilgi['son_mesaj']!r}")
 
 
 def _github_output_yaz(anahtar, deger):
@@ -448,8 +492,9 @@ def _aktif_ozet_olustur():
 
 def _alarmlari_kontrol_et_ve_bildir(bot_token, admin_id):
     """Aktif fiyat alarmlarını günceli fiyatlarla karşılaştırır; koşulu
-    sağlayanları admin'e Telegram'dan bildirip 'tetiklendi' işaretler.
-    Claude'a hiç dokunmaz — sadece CoinGecko + Telegram kullanır."""
+    sağlayanları alarmı KURAN sohbete (grup ise gruba, yoksa admin'e)
+    Telegram'dan bildirip 'tetiklendi' işaretler. Claude'a hiç dokunmaz —
+    sadece CoinGecko + Telegram kullanır."""
     alarmlar = _alarmlari_oku()
     aktifler = [a for a in alarmlar if a.get("durum") == "aktif"]
     if not aktifler:
@@ -475,7 +520,7 @@ def _alarmlari_kontrol_et_ve_bildir(bot_token, admin_id):
         sembol = a.get("sembol") or a.get("coingecko_id", "")
         yon_metni = "üzerine çıktı" if a["yon"] == "uzerinde" else "altına indi"
         telegram_gonder(
-            bot_token, admin_id,
+            bot_token, a.get("chat_id") or admin_id,
             f"🔔 <b>Fiyat Alarmı!</b>\n{html.escape(sembol)} hedefin olan "
             f"{_fiyat_bicimle(hedef)} {yon_metni} — şu an: {_fiyat_bicimle(fiyat)}"
         )
@@ -643,7 +688,8 @@ def _mail_gonder(konu, govde):
 
 def _vadesi_gelmis_gorevleri_gonder(bot_token, admin_id):
     """Vadesi gelmiş 'bekliyor' görevler için mail içeriği üretip gönderir,
-    her görevin durumunu günceller ve admin'i Telegram'dan bilgilendirir."""
+    her görevin durumunu günceller ve görevi KURAN sohbeti (grup ise gruba,
+    yoksa admin'e) Telegram'dan bilgilendirir."""
     gorevler = _gorevleri_oku()
     simdi = datetime.now(IST)
     degisti = False
@@ -661,6 +707,7 @@ def _vadesi_gelmis_gorevleri_gonder(bot_token, admin_id):
         if hz > simdi:
             continue
 
+        hedef_sohbet = g.get("chat_id") or admin_id
         icerik_talebi = str(g.get("icerik_talebi", "")).strip()
         print(f"[bilgi] Görev vadesi geldi, mail hazırlanıyor: {icerik_talebi[:80]!r}",
               file=sys.stderr)
@@ -671,13 +718,13 @@ def _vadesi_gelmis_gorevleri_gonder(bot_token, admin_id):
             _mail_gonder(konu, govde)
             g["durum"] = "gonderildi"
             g["gonderim_zamani"] = simdi.isoformat()
-            telegram_gonder(bot_token, admin_id,
+            telegram_gonder(bot_token, hedef_sohbet,
                             f"✅ Mail gönderildi: <i>{html.escape(icerik_talebi[:150])}</i>")
         except Exception as e:                       # noqa: BLE001
             g["durum"] = "hata"
             g["hata"] = str(e)[:300]
             print(f"[uyarı] Görev maili gönderilemedi: {_gizle(e)}", file=sys.stderr)
-            telegram_gonder(bot_token, admin_id,
+            telegram_gonder(bot_token, hedef_sohbet,
                             f"⚠️ Zamanlanmış mail gönderilemedi: {html.escape(str(e)[:300])}")
         degisti = True
 
@@ -685,40 +732,46 @@ def _vadesi_gelmis_gorevleri_gonder(bot_token, admin_id):
         _gorevleri_yaz(gorevler)
 
 
-def kontrol_et(bot_token, admin_id):
-    """Yeni admin mesajı YA DA vadesi gelmiş mail görevi var mı bakar (Claude'a
-    dokunmadan) VE aktif fiyat alarmlarını kontrol edip tetiklenenleri
-    Telegram'dan bildirir (bu da Claude gerektirmez — sadece CoinGecko)."""
+def kontrol_et(bot_token, admin_id, grup_id=None):
+    """Yeni yetkili (admin ve varsa grup) mesajı YA DA vadesi gelmiş mail
+    görevi var mı bakar (Claude'a dokunmadan) VE aktif fiyat alarmlarını
+    kontrol edip tetiklenenleri Telegram'dan bildirir (bu da Claude
+    gerektirmez — sadece CoinGecko)."""
+    yetkili_id_seti = {admin_id} | ({grup_id} if grup_id else set())
     durum = _durum_oku()
     ud = durum.get("son_update_id")
     guncellemeler = _guncellemeleri_al(bot_token, ud + 1 if ud else None)
-    mesajlar, _ = _admin_mesajlarini_ayikla(guncellemeler, admin_id)
+    mesajlar, _ = _yetkili_mesajlari_ayikla(guncellemeler, yetkili_id_seti)
     gorev_vadesi_geldi = _vadesi_gelmis_gorev_var_mi()
     islenecek_var = bool(mesajlar) or gorev_vadesi_geldi
     _github_output_yaz("mesaj_var", "true" if islenecek_var else "false")
-    print(f"[bilgi] {len(guncellemeler)} güncelleme, {len(mesajlar)} admin mesajı, "
+    print(f"[bilgi] {len(guncellemeler)} güncelleme, {len(mesajlar)} yetkili mesajı, "
           f"vadesi gelmiş görev: {gorev_vadesi_geldi}.", file=sys.stderr)
 
     _alarmlari_kontrol_et_ve_bildir(bot_token, admin_id)
 
 
-def cevapla(bot_token, admin_id):
-    """Bekleyen admin mesaj(lar)ını Claude ile cevaplar (mail görevlerini
-    state/gorevler.json'a kaydeder), state'i ilerletir, ardından vadesi
-    gelmiş mail görevlerini üretip gönderir."""
+def cevapla(bot_token, admin_id, grup_id=None):
+    """Bekleyen yetkili mesaj(lar)ını (admin ve varsa grup) Claude ile
+    cevaplar (mail görevlerini state/gorevler.json'a kaydeder), state'i
+    ilerletir, ardından vadesi gelmiş mail görevlerini üretip gönderir.
+    Her cevap, sorunun geldiği sohbete gider — admin ve grup TAMAMEN AYNI
+    yetkiye (alarm/mail/portföy dahil) sahiptir, paylaşılan tek state
+    üzerinde çalışılır."""
+    yetkili_id_seti = {admin_id} | ({grup_id} if grup_id else set())
     durum = _durum_oku()
     ud = durum.get("son_update_id")
     guncellemeler = _guncellemeleri_al(bot_token, ud + 1 if ud else None)
-    mesajlar, son_id = _admin_mesajlarini_ayikla(guncellemeler, admin_id)
+    mesajlar, son_id = _yetkili_mesajlari_ayikla(guncellemeler, yetkili_id_seti)
 
     if not mesajlar:
-        print("[bilgi] Cevaplanacak yeni admin mesajı yok.", file=sys.stderr)
+        print("[bilgi] Cevaplanacak yeni yetkili mesajı yok.", file=sys.stderr)
         if son_id is not None:
             _durum_yaz(son_id)
     else:
         simdi_str = datetime.now(IST).strftime("%d.%m.%Y %H:%M, %A")
-        for soru in mesajlar:
-            print(f"[bilgi] Soru cevaplanıyor: {soru[:80]!r}", file=sys.stderr)
+        for chat_id, soru in mesajlar:
+            print(f"[bilgi] ({chat_id}) Soru cevaplanıyor: {soru[:80]!r}", file=sys.stderr)
             notlar = _hafizayi_oku()
             hafiza_str = "\n".join(f"- {n}" for n in notlar) if notlar else "Henüz bir şey kaydedilmedi."
             aktif_ozet = _aktif_ozet_olustur()
@@ -791,6 +844,7 @@ def cevapla(bot_token, admin_id):
                     "hedef_fiyat": float(alarm["hedef_fiyat"]),
                     "olusturulma_zamani": datetime.now(IST).isoformat(),
                     "durum": "aktif",
+                    "chat_id": chat_id,
                 })
                 _alarmlari_yaz(alarmlar)
                 print(f"[bilgi] Yeni fiyat alarmı kaydedildi: {alarmlar[-1]}", file=sys.stderr)
@@ -807,6 +861,7 @@ def cevapla(bot_token, admin_id):
                         "icerik_talebi": str(gorev["icerik_talebi"]).strip(),
                         "olusturulma_zamani": datetime.now(IST).isoformat(),
                         "durum": "bekliyor",
+                        "chat_id": chat_id,
                     })
                     _gorevleri_yaz(gorevler)
                 except (ValueError, KeyError) as e:
@@ -815,7 +870,7 @@ def cevapla(bot_token, admin_id):
                               "belirtir misin? (ör. \"25 Temmuz 09:00\")")
 
             for parca in mesaji_bol(cevap):
-                telegram_gonder(bot_token, admin_id, parca)
+                telegram_gonder(bot_token, chat_id, parca)
 
         # Mesajları başarıyla cevapladıktan sonra state'i ilerlet — yarı yolda
         # hata olursa (ör. 3. soruda) offset ilerlemez, bir sonraki çalıştırma
@@ -830,15 +885,24 @@ def cevapla(bot_token, admin_id):
 def main():
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     admin_id = os.environ.get("TELEGRAM_ADMIN_CHAT_ID")
+    grup_id = os.environ.get("TELEGRAM_GRUP_CHAT_ID") or None
+
+    if "--sohbetleri-listele" in sys.argv:
+        if not bot_token:
+            print("HATA: TELEGRAM_BOT_TOKEN tanımlı değil.", file=sys.stderr)
+            sys.exit(1)
+        sohbetleri_listele(bot_token)
+        return
+
     if not bot_token or not admin_id:
         print("HATA: TELEGRAM_BOT_TOKEN / TELEGRAM_ADMIN_CHAT_ID tanımlı değil.", file=sys.stderr)
         sys.exit(1)
 
     try:
         if "--kontrol" in sys.argv:
-            kontrol_et(bot_token, admin_id)
+            kontrol_et(bot_token, admin_id, grup_id)
         else:
-            cevapla(bot_token, admin_id)
+            cevapla(bot_token, admin_id, grup_id)
     except Exception as e:                           # noqa: BLE001
         print(f"[HATA] {_gizle(e)}", file=sys.stderr)
         admin_hata_bildir(_gizle(e))

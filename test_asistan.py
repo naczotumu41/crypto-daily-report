@@ -15,30 +15,41 @@ def _mesaj(update_id, chat_id, metin):
 
 
 class MesajAyiklama(unittest.TestCase):
-    def test_sadece_admin_mesajlari_donuyor(self):
+    def test_sadece_yetkili_mesajlari_donuyor(self):
         guncellemeler = [
             _mesaj(1, ADMIN, "BTC neden düştü?"),
             _mesaj(2, BASKASI, "bu bota yazan başka biri"),
             _mesaj(3, ADMIN, "haberleri özetle"),
         ]
-        mesajlar, son_id = asistan._admin_mesajlarini_ayikla(guncellemeler, ADMIN)
-        self.assertEqual(mesajlar, ["BTC neden düştü?", "haberleri özetle"])
+        mesajlar, son_id = asistan._yetkili_mesajlari_ayikla(guncellemeler, {ADMIN})
+        self.assertEqual(mesajlar, [(ADMIN, "BTC neden düştü?"), (ADMIN, "haberleri özetle")])
         self.assertEqual(son_id, 3)
 
-    def test_admin_mesaji_yoksa_bos_liste_ama_son_id_ilerler(self):
+    def test_grup_id_de_yetkili_sayilir(self):
+        grup = "999"
+        guncellemeler = [
+            _mesaj(1, ADMIN, "admin sorusu"),
+            _mesaj(2, grup, "grup sorusu"),
+            _mesaj(3, BASKASI, "yabancı mesaj"),
+        ]
+        mesajlar, son_id = asistan._yetkili_mesajlari_ayikla(guncellemeler, {ADMIN, grup})
+        self.assertEqual(mesajlar, [(ADMIN, "admin sorusu"), (grup, "grup sorusu")])
+        self.assertEqual(son_id, 3)
+
+    def test_yetkili_mesaji_yoksa_bos_liste_ama_son_id_ilerler(self):
         guncellemeler = [_mesaj(5, BASKASI, "merhaba")]
-        mesajlar, son_id = asistan._admin_mesajlarini_ayikla(guncellemeler, ADMIN)
+        mesajlar, son_id = asistan._yetkili_mesajlari_ayikla(guncellemeler, {ADMIN})
         self.assertEqual(mesajlar, [])
         self.assertEqual(son_id, 5)
 
     def test_guncelleme_yoksa_son_id_none(self):
-        mesajlar, son_id = asistan._admin_mesajlarini_ayikla([], ADMIN)
+        mesajlar, son_id = asistan._yetkili_mesajlari_ayikla([], {ADMIN})
         self.assertEqual(mesajlar, [])
         self.assertIsNone(son_id)
 
     def test_metinsiz_mesaj_atlanir(self):
         guncellemeler = [{"update_id": 9, "message": {"chat": {"id": ADMIN}}}]  # foto vb.
-        mesajlar, son_id = asistan._admin_mesajlarini_ayikla(guncellemeler, ADMIN)
+        mesajlar, son_id = asistan._yetkili_mesajlari_ayikla(guncellemeler, {ADMIN})
         self.assertEqual(mesajlar, [])
         self.assertEqual(son_id, 9)
 

@@ -38,6 +38,17 @@ Ayrıca **"25 Temmuz saat 09:00'da bana BTC durumunu mail at"** gibi zamanlı g�
 
 **Portföy takibi:** **"0.5 BTC'm var"**, **"portföyüme 2 ETH ekle"** ya da **"tüm SOL'umu sattım"** gibi yaz — miktar `state/portfoy.json`'a kaydedilir. **"Portföyüm ne durumda"** diye sorduğunda ise Claude cevap YAZMAZ; sistem CoinGecko'dan canlı fiyatları çekip her varlığın güncel değerini + 24 saatlik değişimini + toplamı **Python'da hesaplayıp** gönderir (uydurma sayı riski olmasın diye).
 
+### Bir gruba da açmak istersen (opsiyonel)
+
+Botu sadece kendi özel sohbetinle sınırlı tutmak yerine, güvendiğin bir Telegram **grubuna** da ekleyebilirsin — grup üyeleri admin ile **tamamen aynı yetkiye** sahip olur (soru-cevap, alarm, mail, portföy dahil), paylaşılan tek bir state üzerinde çalışılır. Sadece güvendiğin kişilerin olduğu bir grup için düşünülmüştür; herkese açık/büyük bir grup için önerilmez (Claude aboneliği ve mail kotası paylaşılır).
+
+1. Botu gruba ekle, **yönetici (admin)** yap (bu, Telegram'ın "gizlilik modu"nu atlayıp botun tüm mesajları görmesini sağlar — admin olmazsa bot sadece kendine yazılan komutları görür).
+2. Grupta herhangi bir mesaj yaz.
+3. Repo → **Actions → Kripto Asistan → Run workflow** → **mod**: `sohbetleri-listele` seç, çalıştır. Loglarda grubun `chat_id`'sini (negatif bir sayı, örn. `-1001234567890`) göreceksin.
+4. Repo → **Settings → Secrets and variables → Actions** → yeni secret: `TELEGRAM_GRUP_CHAT_ID` = bulduğun değer.
+
+Bu secret yoksa/boşsa bot sadece admin'e özelden cevap vermeye devam eder — davranış değişmez.
+
 ---
 
 ## 📉 Futures sinyalleri — 8 saatte bir teknik analiz (yeni)

@@ -16,13 +16,42 @@ on:
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:            # GitHub arayüzünden elle çalıştırma (test için)
+    inputs:
+      mod:
+        description: "normal: her zamanki çalışma. sohbetleri-listele: grup chat_id'sini bulmak için tek seferlik kurulum aracı (önce gruba bir mesaj at)."
+        type: choice
+        options:
+          - normal
+          - sohbetleri-listele
+        default: normal
 
 concurrency:
   group: asistan
   cancel-in-progress: false
 
 jobs:
+  sohbetleri-listele:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.mod == 'sohbetleri-listele' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repoyu çek
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Python bağımlılıklarını kur
+        run: pip install -r requirements.txt
+
+      - name: Son sohbetleri listele (grup chat_id'sini bulmak için)
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: python asistan.py --sohbetleri-listele
+
   kontrol:
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.mod == 'normal' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -47,6 +76,7 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_ADMIN_CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
+          TELEGRAM_GRUP_CHAT_ID: ${{ secrets.TELEGRAM_GRUP_CHAT_ID }}
         run: python asistan.py --kontrol
 
       - name: Durumu kaydet (tetiklenen alarmlar)
@@ -115,6 +145,7 @@ jobs:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           TELEGRAM_BOT_TOKEN:      ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_ADMIN_CHAT_ID:  ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
+          TELEGRAM_GRUP_CHAT_ID:   ${{ secrets.TELEGRAM_GRUP_CHAT_ID }}
           SMTP_GMAIL_ADRES:        ${{ secrets.SMTP_GMAIL_ADRES }}
           SMTP_UYGULAMA_SIFRESI:   ${{ secrets.SMTP_UYGULAMA_SIFRESI }}
           ALICI_EMAIL:             ${{ secrets.ALICI_EMAIL }}
