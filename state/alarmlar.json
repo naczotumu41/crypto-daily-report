@@ -29,7 +29,9 @@
       "durum": "aktif",
       "chat_id": "-1003953572489",
       "yuzde_esik": 0.01,
-      "pencere_dakika": 60
+      "pencere_dakika": 60,
+      "son_tetiklenme_zamani": "2026-08-12T17:58:19.899920+03:00",
+      "son_tetiklenme_yuzde": -0.6575121029878458
     }
   ]
 }
