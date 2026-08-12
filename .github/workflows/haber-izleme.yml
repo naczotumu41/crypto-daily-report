@@ -1,0 +1,88 @@
+name: Coin Haber İzleme (6 Saatte Bir)
+
+# İzlemeye alınan coin'ler ("HYPE ile ilgili önemli bir haber çıkarsa haber ver")
+# için 6 saatte bir derin araştırma yapıp SADECE gerçekten yeni/önemli ve
+# birincil kaynaklı gelişmeleri izlemeyi kuran sohbete Telegram'dan gönderir.
+# İzleme kaydı oluşturma/iptal etme asistan.py (DURUM G / DURUM D) tarafından
+# yapılır; bu workflow sadece periyodik araştırmayı çalıştırır.
+#
+# NOT: GitHub'ın kendi cron zamanlayıcısı bu repo için güvenilmez bulundu
+# (bkz. proje notları / asistan.yml). Asıl tetikleme dışarıdan cron-job.org
+# ile 6 saatte bir workflow_dispatch çağrılarak yapılıyor. Aşağıdaki
+# `schedule` sadece best-effort bir yedek.
+on:
+  schedule:
+    - cron: "20 */6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: haber-izleme
+  cancel-in-progress: false
+
+jobs:
+  arastir:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    timeout-minutes: 15
+    steps:
+      - name: Repoyu çek
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Python 3.11 kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Node.js kur (Claude Code CLI için)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Python bağımlılıklarını kur
+        run: pip install -r requirements.txt
+
+      - name: Claude Code CLI kur
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: İzlenen coin'ler için haberleri araştır ve bildir
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          TELEGRAM_BOT_TOKEN:      ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ADMIN_CHAT_ID:  ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
+        run: python haber_izleme.py
+
+      - name: Durumu kaydet (bildirilen başlıklar)
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_ADMIN_CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
+        run: |
+          if [ -f state/haber_izleme.json ] && [ -n "$(git status --porcelain state/haber_izleme.json 2>/dev/null)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add state/haber_izleme.json
+            git commit -m "chore: haber izleme durumu"
+            basarili=false
+            for deneme in 1 2 3 4 5; do
+              git rebase --abort >/dev/null 2>&1 || true
+              if git pull --rebase --autostash origin main && git push; then
+                basarili=true
+                break
+              fi
+              echo "[uyarı] Push denemesi $deneme/5 başarısız, tekrar deneniyor..."
+              git rebase --abort >/dev/null 2>&1 || true
+              sleep $((deneme * 4))
+            done
+            if [ "$basarili" != true ]; then
+              echo "::error::Haber izleme durumu 5 denemede de push edilemedi — aynı haber tekrar bildirilebilir!"
+              curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+                -d "chat_id=${TELEGRAM_ADMIN_CHAT_ID}" \
+                -d "text=⚠️ Haber izleme durumu GitHub'a kaydedilemedi, birkaç deneme başarısız oldu. Bir sonraki çalışmada aynı haber tekrar bildirilebilir." \
+                >/dev/null || true
+              exit 1
+            fi
+          else
+            echo "haber izleme durumu degismedi"
+          fi

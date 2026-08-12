@@ -465,20 +465,60 @@ class IptalAyiklama(unittest.TestCase):
         _, iptal = asistan._iptal_ayikla(ham)
         self.assertIsNone(iptal)
 
+    def test_haber_izleme_turu_kabul_edilir(self):
+        ham = '===IPTAL===\n{"tur": "haber_izleme", "id": "i1"}\n===IPTAL-SON==='
+        _, iptal = asistan._iptal_ayikla(ham)
+        self.assertEqual(iptal["tur"], "haber_izleme")
+        self.assertEqual(iptal["id"], "i1")
+
+
+class HaberIzlemeAyiklama(unittest.TestCase):
+    def test_haber_izleme_blogu_ayiklanir_ve_metinden_temizlenir(self):
+        ham = (
+            "Tamam, HYPE ile ilgili önemli bir gelişme olursa haber vereceğim.\n"
+            "===HABER_IZLEME===\n"
+            '{"coingecko_id": "hyperliquid", "sembol": "HYPE"}\n'
+            "===HABER_IZLEME-SON==="
+        )
+        temiz, izleme = asistan._haber_izleme_ayikla(ham)
+        self.assertEqual(temiz, "Tamam, HYPE ile ilgili önemli bir gelişme olursa haber vereceğim.")
+        self.assertEqual(izleme["coingecko_id"], "hyperliquid")
+        self.assertEqual(izleme["sembol"], "HYPE")
+
+    def test_haber_izleme_blogu_yoksa_none_doner(self):
+        temiz, izleme = asistan._haber_izleme_ayikla("Sadece normal bir cevap.")
+        self.assertEqual(temiz, "Sadece normal bir cevap.")
+        self.assertIsNone(izleme)
+
+    def test_coingecko_id_eksikse_yoksayilir(self):
+        ham = '===HABER_IZLEME===\n{"sembol": "HYPE"}\n===HABER_IZLEME-SON==='
+        _, izleme = asistan._haber_izleme_ayikla(ham)
+        self.assertIsNone(izleme)
+
+    def test_gecersiz_json_yoksayilir(self):
+        ham = "===HABER_IZLEME===\nbu json degil\n===HABER_IZLEME-SON==="
+        _, izleme = asistan._haber_izleme_ayikla(ham)
+        self.assertIsNone(izleme)
+
 
 class AktifOzetOlusturma(unittest.TestCase):
     def setUp(self):
         self._orig_alarm_oku = asistan._alarmlari_oku
         self._orig_gorev_oku = asistan._gorevleri_oku
+        self._orig_izleme_oku = asistan._izlenenleri_oku
+        asistan._izlenenleri_oku = lambda: []
 
     def tearDown(self):
         asistan._alarmlari_oku = self._orig_alarm_oku
         asistan._gorevleri_oku = self._orig_gorev_oku
+        asistan._izlenenleri_oku = self._orig_izleme_oku
 
     def test_hicbir_sey_yoksa_bilgi_mesaji(self):
         asistan._alarmlari_oku = lambda: []
         asistan._gorevleri_oku = lambda: []
-        self.assertEqual(asistan._aktif_ozet_olustur(), "Şu an aktif alarm veya bekleyen görev yok.")
+        self.assertEqual(
+            asistan._aktif_ozet_olustur(),
+            "Şu an aktif alarm, bekleyen görev ya da haber izlemesi yok.")
 
     def test_sadece_aktif_ve_bekleyenler_listelenir(self):
         asistan._alarmlari_oku = lambda: [
@@ -496,6 +536,18 @@ class AktifOzetOlusturma(unittest.TestCase):
         self.assertIn("id=g1", ozet)
         self.assertNotIn("id=a2", ozet)
         self.assertNotIn("id=g2", ozet)
+
+    def test_sadece_aktif_haber_izlemeleri_listelenir(self):
+        asistan._alarmlari_oku = lambda: []
+        asistan._gorevleri_oku = lambda: []
+        asistan._izlenenleri_oku = lambda: [
+            {"id": "i1", "sembol": "HYPE", "coingecko_id": "hyperliquid", "durum": "aktif"},
+            {"id": "i2", "sembol": "SOL", "coingecko_id": "solana", "durum": "iptal_edildi"},
+        ]
+        ozet = asistan._aktif_ozet_olustur()
+        self.assertIn("id=i1", ozet)
+        self.assertIn("HYPE", ozet)
+        self.assertNotIn("id=i2", ozet)
 
 
 class PortfoyAyiklama(unittest.TestCase):

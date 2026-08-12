@@ -159,7 +159,7 @@ jobs:
           TELEGRAM_ADMIN_CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
         run: |
           degisti=false
-          for f in state/asistan.json state/gorevler.json state/hafiza.json state/alarmlar.json state/portfoy.json; do
+          for f in state/asistan.json state/gorevler.json state/hafiza.json state/alarmlar.json state/portfoy.json state/haber_izleme.json; do
             if [ -f "$f" ] && [ -n "$(git status --porcelain "$f" 2>/dev/null)" ]; then
               git add "$f"
               degisti=true
