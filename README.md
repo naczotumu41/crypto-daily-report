@@ -32,7 +32,11 @@ Ayrıca **"25 Temmuz saat 09:00'da bana BTC durumunu mail at"** gibi zamanlı g�
 
 **Ayrıca seni zamanla "tanır":** Her cevaptan sonra, hakkında öğrendiği kalıcı bir bilgi/tercih varsa (ör. hangi coin'lerle ilgilendiğin, risk toleransın, sevdiğin rapor üslubu) bunu `state/hafiza.json`'a sessizce kaydeder ve bir sonraki soruda bunu bağlam olarak kullanır — bu ekstra secret ya da kurulum gerektirmez, otomatik işler.
 
-**Fiyat alarmları:** **"BTC 68.000'i geçerse haber ver"** ya da **"ETH 3.000'in altına inerse söyle"** gibi yaz, bot onaylar ve arka planda izlemeye başlar. Bu kontrol Claude gerektirmez — sadece CoinGecko'dan anlık fiyat çeker — bu yüzden `.github/workflows/asistan.yml`'nin *her* çalıştırmasında (Claude Code hiç kurulmadan) kontrol edilir; alarm tetiklenince Telegram'dan anında bildirim gelir ve alarm otomatik kapanır (tek seferlik, tekrar tetiklenmez). `state/alarmlar.json`'da tutulur, ekstra secret gerekmez.
+**Fiyat alarmları — iki tür:**
+- **Hedef alarmı** (tek seferlik): **"BTC 68.000'i geçerse haber ver"** ya da **"ETH 3.000'in altına inerse söyle"** gibi yaz; tetiklenince Telegram'dan anında bildirim gelir ve alarm otomatik kapanır.
+- **Hareket alarmı** (tekrarlayan): **"BTC 1 saatte %5'ten fazla hareket ederse haber ver"** gibi yaz; koşul her sağlandığında (en az pencere süresi kadar arayla, spam olmasın diye) yeniden tetiklenebilir. Değişim, CoinGecko'nun ~24 saatlik fiyat geçmişinden hesaplanır.
+
+Her iki kontrol de Claude gerektirmez — sadece CoinGecko'dan veri çeker — bu yüzden `.github/workflows/asistan.yml`'nin *her* çalıştırmasında (Claude Code hiç kurulmadan) kontrol edilir. `state/alarmlar.json`'da tutulur, ekstra secret gerekmez.
 
 **Listeleme ve iptal:** **"alarmlarım neler"** / **"bekleyen görevlerim var mı"** diye sorabilir, **"BTC alarmını iptal et"** ya da **"yarınki maili iptal et"** diyebilirsin. Aktif alarm/görev listesi (id'leriyle) her soruda Claude'a bağlam olarak verilir; iptal isteğinde doğru öğeyi bulup "iptal_edildi" işaretler.
 

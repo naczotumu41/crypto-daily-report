@@ -7,11 +7,13 @@ Kripto Asistan — Telegram'dan Soru Al, Claude ile Cevapla, Zamanlı Mail Gönd
 report.py'nin günlük 08:00 raporundan AYRI, admin'in Telegram'da bota özelden
 yazdığı soruları (haber, "neden düştü/battı", genel piyasa soruları)
 cevaplayan, "şu gün şu saatte bana ... mail at" görevlerini zamanında yerine
-getiren VE fiyat alarmlarını ("BTC 65000'i geçerse haber ver") izleyen ek
-katman. GitHub Actions'ta ayrı bir workflow (asistan.yml) her birkaç
-dakikada bir çalışır; yeni mesaj/vadesi gelmiş görev yoksa Claude'a hiç
-dokunmadan çıkar — fiyat alarmı kontrolü de Claude gerektirmez, her
-çalıştırmada ucuz tarafta (CoinGecko + Telegram) yapılır.
+getiren VE fiyat alarmlarını izleyen ek katman. İki alarm türü var: "hedef"
+("BTC 65000'i geçerse haber ver" — tek seferlik, tetiklenince kapanır) ve
+"yuzde" ("BTC 1 saatte %5'ten fazla hareket ederse haber ver" — tekrarlayan,
+pencere kadar bir bekleme/cooldown ile). GitHub Actions'ta ayrı bir workflow
+(asistan.yml) her birkaç dakikada bir çalışır; yeni mesaj/vadesi gelmiş
+görev yoksa Claude'a hiç dokunmadan çıkar — alarm kontrolü de Claude
+gerektirmez, her çalıştırmada ucuz tarafta (CoinGecko + Telegram) yapılır.
 
 Her cevapta, kullanıcı hakkında öğrenilen kalıcı bilgiler (ilgilendiği
 coin'ler, risk toleransı, tercih ettiği üslup vb.) state/hafiza.json'a
@@ -134,14 +136,19 @@ DURUM A — Kullanıcı senden GELECEKTE belirli bir gün/saatte MAİL gönderme
   - icerik_talebi alanı, o an ayrı bir Claude çağrısına doğrudan talimat olarak verilecek; bağımsız, net ve kendi başına anlaşılır olsun (ör. "Güncel BTC ve ETH fiyatlarını, 24 saatlik değişimi ve varsa önemli gelişmeleri özetle").
   - Bu durumda NORMAL cevap yazma, SADECE onay cümlesi + görev bloğunu yaz.
 
-DURUM C — Kullanıcı senden bir FİYAT ALARMI kurmanı istiyor (ör. "BTC 65000'i geçerse haber ver", "ETH 3000'in altına inerse söyle"):
-  1. Kullanıcıya TEK CÜMLELİK kısa bir onay yaz (ör. "Tamam, BTC $65,000 üzerine çıkınca haber vereceğim.").
-  2. Onay cümlesinin hemen altına, TAM bu formatta bir alarm bloğu ekle (Telegram'a GİTMEYECEK, sistem tarafından okunacak):
+DURUM C — Kullanıcı senden bir FİYAT ALARMI kurmanı istiyor. İki tür olabilir:
+
+  (a) SABİT HEDEF alarmı (ör. "BTC 65000'i geçerse haber ver", "ETH 3000'in altına inerse söyle") — TEK SEFERLİKTİR, tetiklenince kapanır:
 ===ALARM===
-{{"coingecko_id": "coingecko.com'daki DOĞRU api id'si, örn. bitcoin/ethereum/solana/binancecoin/ripple/aave/bittensor", "sembol": "gösterim sembolü, örn. BTC", "yon": "uzerinde" veya "altinda", "hedef_fiyat": sayı (USD, sadece rakam)}}
+{{"tur": "hedef", "coingecko_id": "coingecko.com'daki DOĞRU api id'si, örn. bitcoin/ethereum/solana/binancecoin/ripple/aave/bittensor", "sembol": "gösterim sembolü, örn. BTC", "yon": "uzerinde" veya "altinda", "hedef_fiyat": sayı (USD, sadece rakam)}}
 ===ALARM-SON===
-  - coingecko_id'yi mümkün olduğunca doğru ver; emin değilsen en olası CoinGecko id'sini kullan.
-  - Bu durumda NORMAL cevap yazma, SADECE onay cümlesi + alarm bloğunu yaz.
+
+  (b) YÜZDESEL HAREKET alarmı (ör. "BTC 1 saatte %5'ten fazla hareket ederse haber ver", "ETH bir günde %10 değişirse söyle") — TEKRARLAYANDIR, koşul her sağlandığında (en az pencere kadar arayla) yeniden tetiklenebilir:
+===ALARM===
+{{"tur": "yuzde", "coingecko_id": "coingecko.com'daki DOĞRU api id'si", "sembol": "gösterim sembolü", "yuzde_esik": sayı (%, pozitif, ör. 5), "pencere_dakika": sayı (dakika; "1 saat"→60, "1 gün"→1440; kullanıcı belirtmezse 60 varsay)}}
+===ALARM-SON===
+
+  Her iki durumda da: kullanıcıya TEK CÜMLELİK kısa bir onay yaz, hemen altına ilgili bloğu ekle, coingecko_id'yi mümkün olduğunca doğru ver. Bu durumda NORMAL cevap yazma, SADECE onay cümlesi + alarm bloğunu yaz.
 
 DURUM D — Kullanıcı senden bir ALARMI ya da GÖREVİ (bekleyen maili) İPTAL etmeni istiyor (ör. "BTC alarmını iptal et", "yarınki maili iptal et"):
   1. Yukarıdaki AKTİF ALARMLARIN VE BEKLEYEN GÖREVLERİN listesinden hangi öğeyi kastettiğini (sembol/açıklamaya göre) bul.
@@ -378,15 +385,22 @@ def _hafiza_notlarini_ayikla(cevap):
 
 def _alarm_ayikla(cevap):
     """Claude'un ham cevabından ===ALARM===...===ALARM-SON=== bloğunu ayıklar.
-    (temiz_cevap, alarm_dict_or_None) döndürür."""
+    İki tür alarmı doğrular: "hedef" (sabit fiyat, tur belirtilmezse varsayılan)
+    ve "yuzde" (pencere içinde yüzdesel hareket). (temiz_cevap,
+    alarm_dict_or_None) döndürür."""
     m = re.search(r"===ALARM===\s*(.*?)\s*===ALARM-SON===", cevap, re.S)
     alarm = None
     if m:
         try:
             v = json.loads(m.group(1).strip())
-            if (isinstance(v, dict) and v.get("coingecko_id") and v.get("yon") in ("uzerinde", "altinda")
-                    and isinstance(v.get("hedef_fiyat"), (int, float)) and v["hedef_fiyat"] > 0):
-                alarm = v
+            if isinstance(v, dict) and v.get("coingecko_id"):
+                tur = v.get("tur", "hedef")
+                if (tur == "hedef" and v.get("yon") in ("uzerinde", "altinda")
+                        and isinstance(v.get("hedef_fiyat"), (int, float)) and v["hedef_fiyat"] > 0):
+                    alarm = v
+                elif (tur == "yuzde" and isinstance(v.get("yuzde_esik"), (int, float))
+                        and v["yuzde_esik"] > 0):
+                    alarm = v
         except ValueError:
             alarm = None
     temiz = re.sub(r"===ALARM===.*?===ALARM-SON===", "", cevap, flags=re.S).strip()
@@ -503,6 +517,36 @@ def _fiyatlari_cek(coingecko_idler):
     return {cid: d["usd"] for cid, d in veri.items() if isinstance(d, dict) and "usd" in d}
 
 
+def _yuzde_degisimi_hesapla(coingecko_id, pencere_dakika):
+    """CoinGecko market_chart'tan (son 24s, ~5dk aralıklı) son `pencere_dakika`
+    içindeki fiyat değişim yüzdesini hesaplar. (eski_fiyat, guncel_fiyat,
+    yuzde_degisim) ya da yetersiz veri varsa None döndürür."""
+    veri = _get_json(
+        f"https://api.coingecko.com/api/v3/coins/{coingecko_id}/market_chart",
+        params={"vs_currency": "usd", "days": 1},
+    )
+    fiyatlar = veri.get("prices", [])
+    if len(fiyatlar) < 2:
+        return None
+
+    simdi_ms = fiyatlar[-1][0]
+    hedef_ms = simdi_ms - pencere_dakika * 60 * 1000
+    eski_fiyat = None
+    for ts, fiyat in fiyatlar:
+        if ts <= hedef_ms:
+            eski_fiyat = fiyat
+        else:
+            break
+    if eski_fiyat is None:
+        eski_fiyat = fiyatlar[0][1]  # pencere elimizdeki veriden uzunsa en eskiyi kullan
+
+    guncel_fiyat = fiyatlar[-1][1]
+    if not eski_fiyat:
+        return None
+    yuzde_degisim = (guncel_fiyat - eski_fiyat) / eski_fiyat * 100
+    return eski_fiyat, guncel_fiyat, yuzde_degisim
+
+
 def _aktif_ozet_olustur():
     """Aktif alarm ve bekleyen görevleri, Claude'a bağlam olarak verilecek
     kısa bir metin halinde özetler (id'ler dahil — 'listele'/'iptal et'
@@ -514,11 +558,17 @@ def _aktif_ozet_olustur():
 
     satirlar = []
     for a in alarmlar:
-        yon_tr = "üzerine çıkarsa" if a.get("yon") == "uzerinde" else "altına inerse"
-        satirlar.append(
-            f"- [ALARM id={a.get('id')}] {a.get('sembol')} "
-            f"{_fiyat_bicimle(a.get('hedef_fiyat', 0))} {yon_tr}"
-        )
+        if a.get("tur") == "yuzde":
+            satirlar.append(
+                f"- [ALARM id={a.get('id')}] {a.get('sembol')} son {a.get('pencere_dakika', 60)} "
+                f"dakikada %{a.get('yuzde_esik')}'ten fazla hareket ederse (tekrarlayan)"
+            )
+        else:
+            yon_tr = "üzerine çıkarsa" if a.get("yon") == "uzerinde" else "altına inerse"
+            satirlar.append(
+                f"- [ALARM id={a.get('id')}] {a.get('sembol')} "
+                f"{_fiyat_bicimle(a.get('hedef_fiyat', 0))} {yon_tr}"
+            )
     for g in gorevler:
         satirlar.append(
             f"- [GOREV id={g.get('id')}] {g.get('hedef_zaman')} — "
@@ -527,24 +577,20 @@ def _aktif_ozet_olustur():
     return "\n".join(satirlar)
 
 
-def _alarmlari_kontrol_et_ve_bildir(bot_token, admin_id):
-    """Aktif fiyat alarmlarını günceli fiyatlarla karşılaştırır; koşulu
-    sağlayanları alarmı KURAN sohbete (grup ise gruba, yoksa admin'e)
-    Telegram'dan bildirip 'tetiklendi' işaretler. Claude'a hiç dokunmaz —
-    sadece CoinGecko + Telegram kullanır."""
-    alarmlar = _alarmlari_oku()
-    aktifler = [a for a in alarmlar if a.get("durum") == "aktif"]
-    if not aktifler:
-        return
-
+def _hedef_alarmlarini_kontrol_et(hedef_alarmlari, bot_token, admin_id, simdi):
+    """SABİT HEDEF alarmlarını (tek seferlik) kontrol eder, tetiklenenleri
+    bildirip 'tetiklendi' işaretler. Alarmları yerinde değiştirir; en az bir
+    değişiklik olduysa True döndürür."""
+    if not hedef_alarmlari:
+        return False
     try:
-        fiyatlar = _fiyatlari_cek([a.get("coingecko_id") for a in aktifler])
+        fiyatlar = _fiyatlari_cek([a.get("coingecko_id") for a in hedef_alarmlari])
     except Exception as e:                               # noqa: BLE001
         print(f"[uyarı] Alarm fiyatları çekilemedi: {_gizle(e)}", file=sys.stderr)
-        return
+        return False
 
     degisti = False
-    for a in aktifler:
+    for a in hedef_alarmlari:
         fiyat = fiyatlar.get(a.get("coingecko_id"))
         if fiyat is None:
             continue
@@ -562,13 +608,79 @@ def _alarmlari_kontrol_et_ve_bildir(bot_token, admin_id):
             f"{_fiyat_bicimle(hedef)} {yon_metni} — şu an: {_fiyat_bicimle(fiyat)}"
         )
         a["durum"] = "tetiklendi"
-        a["tetiklenme_zamani"] = datetime.now(IST).isoformat()
+        a["tetiklenme_zamani"] = simdi.isoformat()
         a["tetiklenme_fiyati"] = fiyat
         degisti = True
         print(f"[bilgi] Alarm tetiklendi: {sembol} {a['yon']} {hedef} (şu an {fiyat}).",
               file=sys.stderr)
+    return degisti
 
-    if degisti:
+
+def _yuzde_alarmlarini_kontrol_et(yuzde_alarmlari, bot_token, admin_id, simdi):
+    """YÜZDESEL HAREKET alarmlarını (tekrarlayan) kontrol eder. Bir alarm
+    tetiklenirse "aktif" kalır ama pencere_dakika kadar bir bekleme
+    (cooldown) uygulanır ki sürekli hareket sırasında her dakika spam
+    yapmasın. Alarmları yerinde değiştirir; en az bir değişiklik olduysa
+    True döndürür."""
+    degisti = False
+    for a in yuzde_alarmlari:
+        pencere = a.get("pencere_dakika", 60)
+        son_tetiklenme = a.get("son_tetiklenme_zamani")
+        if son_tetiklenme:
+            try:
+                gecen_dk = (simdi - _hedef_zamani_ayristir(son_tetiklenme)).total_seconds() / 60
+                if gecen_dk < pencere:
+                    continue
+            except ValueError:
+                pass
+
+        try:
+            sonuc = _yuzde_degisimi_hesapla(a.get("coingecko_id"), pencere)
+        except Exception as e:                           # noqa: BLE001
+            print(f"[uyarı] Yüzde alarmı hesaplanamadı ({a.get('sembol')}): {_gizle(e)}",
+                  file=sys.stderr)
+            continue
+        if sonuc is None:
+            continue
+        eski_fiyat, guncel_fiyat, yuzde_degisim = sonuc
+        esik = a.get("yuzde_esik", 5.0)
+        if abs(yuzde_degisim) < esik:
+            continue
+
+        sembol = a.get("sembol") or a.get("coingecko_id", "")
+        yon_metni = "yükseldi" if yuzde_degisim > 0 else "düştü"
+        telegram_gonder(
+            bot_token, a.get("chat_id") or admin_id,
+            f"📈 <b>Hareket Alarmı!</b>\n{html.escape(sembol)} son {pencere} dakikada "
+            f"%{abs(yuzde_degisim):.1f} {yon_metni} — {_fiyat_bicimle(eski_fiyat)} → "
+            f"{_fiyat_bicimle(guncel_fiyat)}"
+        )
+        a["son_tetiklenme_zamani"] = simdi.isoformat()
+        a["son_tetiklenme_yuzde"] = yuzde_degisim
+        degisti = True
+        print(f"[bilgi] Yüzde alarmı tetiklendi: {sembol} %{yuzde_degisim:.1f} ({pencere} dk).",
+              file=sys.stderr)
+    return degisti
+
+
+def _alarmlari_kontrol_et_ve_bildir(bot_token, admin_id):
+    """Aktif fiyat alarmlarını (hedef VE yüzdesel) günceli verilerle
+    karşılaştırır; koşulu sağlayanları alarmı KURAN sohbete (grup/kanal ise
+    oraya, yoksa admin'e) Telegram'dan bildirir. Claude'a hiç dokunmaz —
+    sadece CoinGecko + Telegram kullanır."""
+    alarmlar = _alarmlari_oku()
+    aktifler = [a for a in alarmlar if a.get("durum") == "aktif"]
+    if not aktifler:
+        return
+
+    hedef_alarmlari = [a for a in aktifler if a.get("tur", "hedef") == "hedef"]
+    yuzde_alarmlari = [a for a in aktifler if a.get("tur") == "yuzde"]
+    simdi = datetime.now(IST)
+
+    degisti_1 = _hedef_alarmlarini_kontrol_et(hedef_alarmlari, bot_token, admin_id, simdi)
+    degisti_2 = _yuzde_alarmlarini_kontrol_et(yuzde_alarmlari, bot_token, admin_id, simdi)
+
+    if degisti_1 or degisti_2:
         _alarmlari_yaz(alarmlar)
 
 
@@ -877,16 +989,22 @@ def cevapla(bot_token, admin_id, grup_id=None, kanal_id=None):
 
             if alarm:
                 alarmlar = _alarmlari_oku()
-                alarmlar.append({
+                yeni_alarm = {
                     "id": uuid.uuid4().hex[:8],
+                    "tur": alarm.get("tur", "hedef"),
                     "coingecko_id": str(alarm["coingecko_id"]).strip(),
                     "sembol": str(alarm.get("sembol") or alarm["coingecko_id"]).strip(),
-                    "yon": alarm["yon"],
-                    "hedef_fiyat": float(alarm["hedef_fiyat"]),
                     "olusturulma_zamani": datetime.now(IST).isoformat(),
                     "durum": "aktif",
                     "chat_id": chat_id,
-                })
+                }
+                if yeni_alarm["tur"] == "yuzde":
+                    yeni_alarm["yuzde_esik"] = float(alarm["yuzde_esik"])
+                    yeni_alarm["pencere_dakika"] = int(alarm.get("pencere_dakika") or 60)
+                else:
+                    yeni_alarm["yon"] = alarm["yon"]
+                    yeni_alarm["hedef_fiyat"] = float(alarm["hedef_fiyat"])
+                alarmlar.append(yeni_alarm)
                 _alarmlari_yaz(alarmlar)
                 print(f"[bilgi] Yeni fiyat alarmı kaydedildi: {alarmlar[-1]}", file=sys.stderr)
 
