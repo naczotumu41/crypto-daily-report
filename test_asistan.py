@@ -14,6 +14,11 @@ def _mesaj(update_id, chat_id, metin):
     return {"update_id": update_id, "message": {"chat": {"id": chat_id}, "text": metin}}
 
 
+def _kanal_gonderisi(update_id, chat_id, metin):
+    return {"update_id": update_id, "channel_post": {"chat": {"id": chat_id, "type": "channel"},
+                                                       "text": metin}}
+
+
 class MesajAyiklama(unittest.TestCase):
     def test_sadece_yetkili_mesajlari_donuyor(self):
         guncellemeler = [
@@ -52,6 +57,52 @@ class MesajAyiklama(unittest.TestCase):
         mesajlar, son_id = asistan._yetkili_mesajlari_ayikla(guncellemeler, {ADMIN})
         self.assertEqual(mesajlar, [])
         self.assertEqual(son_id, 9)
+
+
+class KanalEtiketAyiklama(unittest.TestCase):
+    KANAL = "-100777"
+
+    def test_kanalda_bot_etiketlenmis_gonderi_kabul_edilir(self):
+        guncellemeler = [_kanal_gonderisi(1, self.KANAL, "@naczotumu_bot BTC ne durumda?")]
+        mesajlar, son_id = asistan._yetkili_mesajlari_ayikla(
+            guncellemeler, {ADMIN}, kanal_id=self.KANAL, bot_kullanici_adi="naczotumu_bot")
+        self.assertEqual(mesajlar, [(self.KANAL, "@naczotumu_bot BTC ne durumda?")])
+        self.assertEqual(son_id, 1)
+
+    def test_kanalda_etiketsiz_gonderi_reddedilir(self):
+        guncellemeler = [_kanal_gonderisi(1, self.KANAL, "BTC bugün yükseldi")]
+        mesajlar, son_id = asistan._yetkili_mesajlari_ayikla(
+            guncellemeler, {ADMIN}, kanal_id=self.KANAL, bot_kullanici_adi="naczotumu_bot")
+        self.assertEqual(mesajlar, [])
+        self.assertEqual(son_id, 1)  # offset yine de ilerler
+
+    def test_etiket_kontrolu_buyuk_kucuk_harf_duyarsiz(self):
+        guncellemeler = [_kanal_gonderisi(1, self.KANAL, "@NaczoTumu_Bot btc?")]
+        mesajlar, _ = asistan._yetkili_mesajlari_ayikla(
+            guncellemeler, {ADMIN}, kanal_id=self.KANAL, bot_kullanici_adi="naczotumu_bot")
+        self.assertEqual(len(mesajlar), 1)
+
+    def test_baska_kanaldan_etiketli_gonderi_de_reddedilir(self):
+        guncellemeler = [_kanal_gonderisi(1, "-100999", "@naczotumu_bot selam")]
+        mesajlar, _ = asistan._yetkili_mesajlari_ayikla(
+            guncellemeler, {ADMIN}, kanal_id=self.KANAL, bot_kullanici_adi="naczotumu_bot")
+        self.assertEqual(mesajlar, [])
+
+    def test_kanal_id_yoksa_kanal_gonderisi_hic_kabul_edilmez(self):
+        guncellemeler = [_kanal_gonderisi(1, self.KANAL, "@naczotumu_bot selam")]
+        mesajlar, _ = asistan._yetkili_mesajlari_ayikla(guncellemeler, {ADMIN})
+        self.assertEqual(mesajlar, [])
+
+    def test_admin_grup_ve_kanal_ayni_anda_calisir(self):
+        guncellemeler = [
+            _mesaj(1, ADMIN, "admin sorusu"),
+            _kanal_gonderisi(2, self.KANAL, "etiketsiz, atlanır"),
+            _kanal_gonderisi(3, self.KANAL, "@naczotumu_bot etiketli soru"),
+        ]
+        mesajlar, son_id = asistan._yetkili_mesajlari_ayikla(
+            guncellemeler, {ADMIN}, kanal_id=self.KANAL, bot_kullanici_adi="naczotumu_bot")
+        self.assertEqual(mesajlar, [(ADMIN, "admin sorusu"), (self.KANAL, "@naczotumu_bot etiketli soru")])
+        self.assertEqual(son_id, 3)
 
 
 class GorevAyiklama(unittest.TestCase):

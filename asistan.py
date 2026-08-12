@@ -42,23 +42,30 @@ Kullanım:
                                  ilerletir, ARDINDAN vadesi gelmiş mail
                                  görevlerini üretip gönderir.
 
-Yalnızca TELEGRAM_ADMIN_CHAT_ID VE (varsa) TELEGRAM_GRUP_CHAT_ID'den gelen
-mesajlar cevaplanır — botla konuşan rastgele biri Claude aboneliğini/mail
-kotasını tüketmesin diye. Grup üyeleri de admin ile TAMAMEN AYNI yetkilere
-sahiptir (alarm/mail/portföy dahil); paylaşılan TEK bir state üzerinde
-çalışılır. Cevaplar, sorunun geldiği sohbete (admin özel ya da grup) gider.
+Yalnızca şu sohbetlerden gelen mesajlar cevaplanır — botla konuşan rastgele
+biri Claude aboneliğini/mail kotasını tüketmesin diye:
+  - TELEGRAM_ADMIN_CHAT_ID ve (varsa) TELEGRAM_GRUP_CHAT_ID: HER mesaja
+    cevap verir, admin ile TAMAMEN AYNI yetkiye sahiptir (alarm/mail/
+    portföy dahil).
+  - (varsa) TELEGRAM_KANAL_CHAT_ID: bir Telegram KANALI için — kanalda zaten
+    sadece yöneticiler paylaşım yapabilir, ama SADECE bot @kullanıcı_adıyla
+    ETİKETLENEN gönderilere cevap verilir (kanalı spam'lememek için).
+Tüm hedefler paylaşılan TEK bir state üzerinde çalışır. Cevaplar, sorunun
+geldiği sohbete gider.
 
 Kullanım (ek):
   python asistan.py --sohbetleri-listele   Son güncellemelerdeki tüm
                                  sohbetleri (chat_id, tür, başlık) yazdırır;
-                                 state'e DOKUNMAZ. Grubun chat_id'sini bulmak
-                                 için kurulumda BİR KEZ kullanılır — önce
-                                 gruba bir mesaj at, sonra bunu çalıştır.
+                                 state'e DOKUNMAZ. Grup/kanal chat_id'sini
+                                 bulmak için kurulumda BİR KEZ kullanılır —
+                                 önce gruba/kanala bir mesaj at, sonra bunu
+                                 çalıştır.
 
 Ortam değişkenleri:
   Mevcut (report.py ile paylaşılır): CLAUDE_CODE_OAUTH_TOKEN,
     TELEGRAM_BOT_TOKEN, TELEGRAM_ADMIN_CHAT_ID
-  Grup desteği için YENİ (opsiyonel): TELEGRAM_GRUP_CHAT_ID
+  Grup/kanal desteği için YENİ (opsiyonel): TELEGRAM_GRUP_CHAT_ID,
+    TELEGRAM_KANAL_CHAT_ID
   Mail özelliği için YENİ (Gmail SMTP, uygulama şifresi ile — ücretsiz):
     SMTP_GMAIL_ADRES, SMTP_UYGULAMA_SIFRESI, ALICI_EMAIL
 """
@@ -222,55 +229,85 @@ def _durum_yaz(son_update_id):
 
 
 def _guncellemeleri_al(bot_token, offset):
-    """Telegram getUpdates ile offset'ten sonraki güncellemeleri çeker."""
-    params = {"timeout": 0, "allowed_updates": json.dumps(["message"])}
+    """Telegram getUpdates ile offset'ten sonraki güncellemeleri çeker.
+    'message' (özel/grup) VE 'channel_post' (kanal gönderisi) türlerini
+    ister — kanal gönderileri message olarak GELMEZ, ayrı bir alandır."""
+    params = {"timeout": 0, "allowed_updates": json.dumps(["message", "channel_post"])}
     if offset is not None:
         params["offset"] = offset
     veri = _get_json(f"https://api.telegram.org/bot{bot_token}/getUpdates", params=params)
     return veri.get("result", [])
 
 
-def _yetkili_mesajlari_ayikla(guncellemeler, yetkili_id_seti):
-    """Güncellemeler arasından yetkili sohbetlerden (admin ve varsa grup)
-    gelen metin mesajlarını çıkarır. ((chat_id, metin) çiftleri listesi,
-    en_buyuk_update_id) döndürür — ikincisi None ise hiç güncelleme yok
-    demektir. son_id, yetkisiz sohbetlerden gelenler dahil TÜM güncellemeler
-    üzerinden hesaplanır (offset doğru ilerlesin diye)."""
+def _guncelleme_icerigi(g):
+    """Bir getUpdates öğesinden mesaj içeriğini döndürür — 'message' (özel/
+    grup) ya da 'channel_post' (kanal) alanlarından hangisi doluysa onu."""
+    return g.get("message") or g.get("channel_post")
+
+
+def _bot_kullanici_adi_al(bot_token):
+    """Botun kendi @kullanıcı_adını (başındaki @ olmadan) döndürür; kanaldaki
+    etiketlenme kontrolü için kullanılır."""
+    veri = _get_json(f"https://api.telegram.org/bot{bot_token}/getMe")
+    return (veri.get("result") or {}).get("username")
+
+
+def _yetkili_mesajlari_ayikla(guncellemeler, yetkili_id_seti, kanal_id=None, bot_kullanici_adi=None):
+    """Güncellemeler arasından yetkili mesajları çıkarır:
+      - admin/grup sohbetlerinden (yetkili_id_seti) GELEN HER MESAJ,
+      - kanal_id'den gelen ve botu (@bot_kullanici_adi) ETİKETLEYEN gönderiler
+        (kanalda sadece admin/yöneticiler paylaşım yapabildiği için bu zaten
+        güvenilir kişilerle sınırlıdır, ama yine de sadece etiketlenince
+        cevap vererek kanalı spam'lememiş oluyoruz).
+    ((chat_id, metin) çiftleri listesi, en_buyuk_update_id) döndürür —
+    ikincisi None ise hiç güncelleme yok demektir. son_id, yetkisiz
+    sohbetlerden gelenler dahil TÜM güncellemeler üzerinden hesaplanır
+    (offset doğru ilerlesin diye)."""
     yetkili_id_seti = {str(x) for x in yetkili_id_seti}
+    kanal_id = str(kanal_id) if kanal_id else None
+    etiket = f"@{bot_kullanici_adi}".lower() if bot_kullanici_adi else None
     mesajlar = []
     son_id = None
     for g in guncellemeler:
         son_id = g["update_id"] if son_id is None else max(son_id, g["update_id"])
-        msg = g.get("message") or {}
-        metin = msg.get("text")
-        chat_id = str((msg.get("chat") or {}).get("id", ""))
-        if metin and chat_id in yetkili_id_seti:
+        icerik = _guncelleme_icerigi(g)
+        if not icerik:
+            continue
+        metin = icerik.get("text")
+        if not metin:
+            continue
+        chat_id = str((icerik.get("chat") or {}).get("id", ""))
+        if chat_id in yetkili_id_seti:
+            mesajlar.append((chat_id, metin))
+        elif kanal_id and chat_id == kanal_id and etiket and etiket in metin.lower():
             mesajlar.append((chat_id, metin))
     return mesajlar, son_id
 
 
 def sohbetleri_listele(bot_token):
     """Son güncellemelerdeki TÜM sohbetleri (id, tür, başlık, son mesaj)
-    yazdırır; state'e dokunmaz, offset'i İLERLETMEZ. Kurulumda grup
+    yazdırır; state'e dokunmaz, offset'i İLERLETMEZ. Kurulumda grup/kanal
     chat_id'sini bulmak için kullanılır."""
     durum = _durum_oku()
     ud = durum.get("son_update_id")
     guncellemeler = _guncellemeleri_al(bot_token, ud + 1 if ud else None)
     if not guncellemeler:
-        print("[bilgi] Yeni güncelleme yok. Önce gruba (ya da bota özelden) bir mesaj at, "
+        print("[bilgi] Yeni güncelleme yok. Önce gruba/kanala (ya da bota özelden) bir mesaj at, "
               "sonra tekrar çalıştır.", file=sys.stderr)
         return
     gorulen = {}
     for g in guncellemeler:
-        msg = g.get("message") or {}
-        chat = msg.get("chat") or {}
+        icerik = _guncelleme_icerigi(g)
+        if not icerik:
+            continue
+        chat = icerik.get("chat") or {}
         cid = chat.get("id")
         if cid is None:
             continue
         gorulen[cid] = {
             "tur": chat.get("type"),
             "baslik": chat.get("title") or chat.get("username") or chat.get("first_name") or "",
-            "son_mesaj": (msg.get("text") or "")[:50],
+            "son_mesaj": (icerik.get("text") or "")[:50],
         }
     if not gorulen:
         print("[bilgi] Güncellemeler var ama içlerinde okunabilir bir sohbet yok.", file=sys.stderr)
@@ -732,16 +769,17 @@ def _vadesi_gelmis_gorevleri_gonder(bot_token, admin_id):
         _gorevleri_yaz(gorevler)
 
 
-def kontrol_et(bot_token, admin_id, grup_id=None):
-    """Yeni yetkili (admin ve varsa grup) mesajı YA DA vadesi gelmiş mail
-    görevi var mı bakar (Claude'a dokunmadan) VE aktif fiyat alarmlarını
-    kontrol edip tetiklenenleri Telegram'dan bildirir (bu da Claude
-    gerektirmez — sadece CoinGecko)."""
+def kontrol_et(bot_token, admin_id, grup_id=None, kanal_id=None):
+    """Yeni yetkili (admin/grup: her mesaj; kanal: sadece bot etiketlenince)
+    mesajı YA DA vadesi gelmiş mail görevi var mı bakar (Claude'a dokunmadan)
+    VE aktif fiyat alarmlarını kontrol edip tetiklenenleri Telegram'dan
+    bildirir (bu da Claude gerektirmez — sadece CoinGecko)."""
     yetkili_id_seti = {admin_id} | ({grup_id} if grup_id else set())
+    bot_kullanici_adi = _bot_kullanici_adi_al(bot_token) if kanal_id else None
     durum = _durum_oku()
     ud = durum.get("son_update_id")
     guncellemeler = _guncellemeleri_al(bot_token, ud + 1 if ud else None)
-    mesajlar, _ = _yetkili_mesajlari_ayikla(guncellemeler, yetkili_id_seti)
+    mesajlar, _ = _yetkili_mesajlari_ayikla(guncellemeler, yetkili_id_seti, kanal_id, bot_kullanici_adi)
     gorev_vadesi_geldi = _vadesi_gelmis_gorev_var_mi()
     islenecek_var = bool(mesajlar) or gorev_vadesi_geldi
     _github_output_yaz("mesaj_var", "true" if islenecek_var else "false")
@@ -751,18 +789,21 @@ def kontrol_et(bot_token, admin_id, grup_id=None):
     _alarmlari_kontrol_et_ve_bildir(bot_token, admin_id)
 
 
-def cevapla(bot_token, admin_id, grup_id=None):
-    """Bekleyen yetkili mesaj(lar)ını (admin ve varsa grup) Claude ile
-    cevaplar (mail görevlerini state/gorevler.json'a kaydeder), state'i
-    ilerletir, ardından vadesi gelmiş mail görevlerini üretip gönderir.
-    Her cevap, sorunun geldiği sohbete gider — admin ve grup TAMAMEN AYNI
-    yetkiye (alarm/mail/portföy dahil) sahiptir, paylaşılan tek state
-    üzerinde çalışılır."""
+def cevapla(bot_token, admin_id, grup_id=None, kanal_id=None):
+    """Bekleyen yetkili mesaj(lar)ını Claude ile cevaplar (mail görevlerini
+    state/gorevler.json'a kaydeder), state'i ilerletir, ardından vadesi
+    gelmiş mail görevlerini üretip gönderir. Her cevap, sorunun geldiği
+    sohbete gider. admin/grup TAMAMEN AYNI yetkiye (alarm/mail/portföy
+    dahil) sahiptir, her mesaja cevap verir; kanal'da ise SADECE bot
+    etiketlenen gönderilere cevap verilir (kanalda zaten sadece yöneticiler
+    paylaşım yapabilir, ama yine de kanalı spam'lememek için etiket şartı
+    var). Paylaşılan tek bir state üzerinde çalışılır."""
     yetkili_id_seti = {admin_id} | ({grup_id} if grup_id else set())
+    bot_kullanici_adi = _bot_kullanici_adi_al(bot_token) if kanal_id else None
     durum = _durum_oku()
     ud = durum.get("son_update_id")
     guncellemeler = _guncellemeleri_al(bot_token, ud + 1 if ud else None)
-    mesajlar, son_id = _yetkili_mesajlari_ayikla(guncellemeler, yetkili_id_seti)
+    mesajlar, son_id = _yetkili_mesajlari_ayikla(guncellemeler, yetkili_id_seti, kanal_id, bot_kullanici_adi)
 
     if not mesajlar:
         print("[bilgi] Cevaplanacak yeni yetkili mesajı yok.", file=sys.stderr)
@@ -886,6 +927,7 @@ def main():
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     admin_id = os.environ.get("TELEGRAM_ADMIN_CHAT_ID")
     grup_id = os.environ.get("TELEGRAM_GRUP_CHAT_ID") or None
+    kanal_id = os.environ.get("TELEGRAM_KANAL_CHAT_ID") or None
 
     if "--sohbetleri-listele" in sys.argv:
         if not bot_token:
@@ -900,9 +942,9 @@ def main():
 
     try:
         if "--kontrol" in sys.argv:
-            kontrol_et(bot_token, admin_id, grup_id)
+            kontrol_et(bot_token, admin_id, grup_id, kanal_id)
         else:
-            cevapla(bot_token, admin_id, grup_id)
+            cevapla(bot_token, admin_id, grup_id, kanal_id)
     except Exception as e:                           # noqa: BLE001
         print(f"[HATA] {_gizle(e)}", file=sys.stderr)
         admin_hata_bildir(_gizle(e))
