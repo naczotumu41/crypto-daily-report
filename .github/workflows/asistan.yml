@@ -18,7 +18,7 @@ on:
   workflow_dispatch:            # GitHub arayüzünden elle çalıştırma (test için)
     inputs:
       mod:
-        description: "normal: her zamanki çalışma. sohbetleri-listele: grup chat_id'sini bulmak için tek seferlik kurulum aracı (önce gruba bir mesaj at)."
+        description: "normal: her zamanki çalışma. sohbetleri-listele: grup/kanal chat_id'sini bulmak için tek seferlik kurulum aracı (önce gruba/kanala bir mesaj at)."
         type: choice
         options:
           - normal
@@ -77,6 +77,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_ADMIN_CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
           TELEGRAM_GRUP_CHAT_ID: ${{ secrets.TELEGRAM_GRUP_CHAT_ID }}
+          TELEGRAM_KANAL_CHAT_ID: ${{ secrets.TELEGRAM_KANAL_CHAT_ID }}
         run: python asistan.py --kontrol
 
       - name: Durumu kaydet (tetiklenen alarmlar)
@@ -146,6 +147,7 @@ jobs:
           TELEGRAM_BOT_TOKEN:      ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_ADMIN_CHAT_ID:  ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
           TELEGRAM_GRUP_CHAT_ID:   ${{ secrets.TELEGRAM_GRUP_CHAT_ID }}
+          TELEGRAM_KANAL_CHAT_ID:  ${{ secrets.TELEGRAM_KANAL_CHAT_ID }}
           SMTP_GMAIL_ADRES:        ${{ secrets.SMTP_GMAIL_ADRES }}
           SMTP_UYGULAMA_SIFRESI:   ${{ secrets.SMTP_UYGULAMA_SIFRESI }}
           ALICI_EMAIL:             ${{ secrets.ALICI_EMAIL }}

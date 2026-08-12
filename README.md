@@ -49,6 +49,17 @@ Botu sadece kendi özel sohbetinle sınırlı tutmak yerine, güvendiğin bir Te
 
 Bu secret yoksa/boşsa bot sadece admin'e özelden cevap vermeye devam eder — davranış değişmez.
 
+### Bir kanalda da (etiketlenince) çalışsın istersen (opsiyonel)
+
+Telegram **kanalları** gruplardan farklıdır: sadece **yöneticiler paylaşım yapabilir**, normal aboneler mesaj atamaz. Bu yüzden bir kanalda botun her paylaşıma değil, **sadece kendisi @kullanıcı_adıyla etiketlendiğinde** cevap vermesi sağlanır — kanalı spam'lememek için.
+
+1. Botu kanala ekle, **yönetici (admin)** yap.
+2. Kanala, botu etiketleyerek bir mesaj at (ör. `@botun_kullanici_adi merhaba`).
+3. Repo → **Actions → Kripto Asistan → Run workflow** → **mod**: `sohbetleri-listele` seç, çalıştır. Loglarda kanalın `chat_id`'sini (negatif bir sayı) göreceksin. (Kanal gönderileri Telegram'da ayrı bir teknik türdür — bu yüzden grup keşfiyle aynı araç ama farklı bir mesaj türü okunuyor.)
+4. Repo → **Settings → Secrets and variables → Actions** → yeni secret: `TELEGRAM_KANAL_CHAT_ID` = bulduğun değer.
+
+Artık kanalda `@botun_kullanici_adi <sorun>` yazan biri (yani kanalın yöneticilerinden biri — kanalda zaten başka kimse yazamaz) cevap alır; etiketlemeden yazılan paylaşımlara dokunulmaz. Bu secret yoksa/boşsa davranış değişmez.
+
 ---
 
 ## 📉 Futures sinyalleri — 8 saatte bir teknik analiz (yeni)
