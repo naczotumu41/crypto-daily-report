@@ -32,6 +32,17 @@
       "pencere_dakika": 60,
       "son_tetiklenme_zamani": "2026-08-12T20:01:19.297466+03:00",
       "son_tetiklenme_yuzde": -0.015698044359671166
+    },
+    {
+      "id": "0b9ebd23",
+      "tur": "yuzde",
+      "coingecko_id": "bitcoin",
+      "sembol": "BTC",
+      "olusturulma_zamani": "2026-08-12T20:06:54.902943+03:00",
+      "durum": "aktif",
+      "chat_id": "-1003953572489",
+      "yuzde_esik": 5.0,
+      "pencere_dakika": 60
     }
   ]
 }
