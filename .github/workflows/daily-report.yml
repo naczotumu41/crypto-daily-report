@@ -76,6 +76,10 @@ jobs:
           TELEGRAM_BOT_TOKEN:      ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID:        ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_ADMIN_CHAT_ID:  ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
+          # Opsiyonel ikinci yayın hedefi (asistan.py'nin kanal/etiket özelliği
+          # için zaten tanımlı olan aynı secret) — ayarlıysa günlük rapor bu
+          # kanala da gider.
+          TELEGRAM_KANAL_CHAT_ID:  ${{ secrets.TELEGRAM_KANAL_CHAT_ID }}
           # Zamanlanmış çalışmada sabit teslim 08:00 TSİ; manuel çalışmada kullanıcı
           # saat girdiyse o, girmediyse boş (hemen gönderir).
           DELIVER_AT_TR: ${{ github.event_name == 'schedule' && '08:00' || inputs.deliver_at }}

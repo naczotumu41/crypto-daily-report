@@ -60,6 +60,8 @@ Telegram **kanalları** gruplardan farklıdır: sadece **yöneticiler paylaşım
 
 Artık kanalda `@botun_kullanici_adi <sorun>` yazan biri (yani kanalın yöneticilerinden biri — kanalda zaten başka kimse yazamaz) cevap alır; etiketlemeden yazılan paylaşımlara dokunulmaz. Bu secret yoksa/boşsa davranış değişmez.
 
+**Aynı `TELEGRAM_KANAL_CHAT_ID` günlük raporu da bu kanala gönderir.** `TELEGRAM_CHAT_ID` kanalına giden 60 saniyelik sabah raporu, bu secret ayarlıysa **aynı zamanda** `TELEGRAM_KANAL_CHAT_ID` kanalına da gider (test/önizleme modlarında gitmez, sadece gerçek günlük gönderimde). Ek bir kurulum gerekmez — kanal/etiket özelliği için zaten eklediysen otomatik işler.
+
 ---
 
 ## 📉 Futures sinyalleri — 8 saatte bir teknik analiz (yeni)

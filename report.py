@@ -644,6 +644,10 @@ def main():
     bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
     kanal_id = os.environ.get("TELEGRAM_CHAT_ID")
     admin_id = os.environ.get("TELEGRAM_ADMIN_CHAT_ID")
+    # Opsiyonel ikinci yayın hedefi — asistan.py'nin kanal/etiket özelliği için
+    # zaten tanımlı TELEGRAM_KANAL_CHAT_ID'yi burada da yeniden kullanıyoruz;
+    # ayarlıysa günlük rapor kanalın yanında bu hedefe de gider.
+    ek_kanal_id = os.environ.get("TELEGRAM_KANAL_CHAT_ID")
 
     if not bot_token:
         print("HATA: TELEGRAM_BOT_TOKEN tanımlı değil.", file=sys.stderr)
@@ -655,11 +659,14 @@ def main():
         hedefler = [("admin", admin_id)]
     else:
         hedefler = [("kanal", kanal_id)]
+    if not (test_modu or onizleme) and ek_kanal_id:
+        hedefler.append(("ek_kanal", ek_kanal_id))
 
+    _DEGISKEN_ADI = {"admin": "TELEGRAM_ADMIN_CHAT_ID", "kanal": "TELEGRAM_CHAT_ID",
+                     "ek_kanal": "TELEGRAM_KANAL_CHAT_ID"}
     for ad, hid in hedefler:
         if not hid:
-            degisken = "TELEGRAM_ADMIN_CHAT_ID" if ad == "admin" else "TELEGRAM_CHAT_ID"
-            print(f"HATA: {degisken} tanımlı değil.", file=sys.stderr)
+            print(f"HATA: {_DEGISKEN_ADI[ad]} tanımlı değil.", file=sys.stderr)
             sys.exit(1)
 
     # Nöbetçi koruması: rapor bugün zaten gönderildiyse boşuna çalışma.
