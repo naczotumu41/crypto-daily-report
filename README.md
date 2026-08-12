@@ -81,6 +81,17 @@ Artık kanalda `@botun_kullanici_adi <sorun>` yazan biri (yani kanalın yönetic
 
 ---
 
+## 📰 Coin haber izleme — fiyattan bağımsız, birincil kaynaklı (yeni)
+
+**"HYPE ile ilgili önemli bir haber çıkarsa haber ver"** gibi yaz — bu, sayısal bir eşik (fiyat/yüzde) değil, coin'le ilgili **gerçek bir gelişme/olay** olduğunda bildirim verir (büyük ortaklık, güvenlik olayı/hack, protokol güncellemesi, düzenleyici karar, önemli on-chain hareket, token ekonomisi değişikliği, önemli listeleme/delisting vb.).
+
+- **`.github/workflows/haber-izleme.yml`** 6 saatte bir çalışır, izlenen her coin için **tek bir derin araştırma** yapar ve sadece **gerçekten yeni** bulguları izlemeyi başlattığın sohbete gönderir. Aynı gelişme bir daha bildirilmez (`state/haber_izleme.json`'daki bilinen başlıklar listesiyle karşılaştırılır).
+- **Kaynak kısıtlaması (önemli sınır):** Araştırma, birincil/güvenilir kaynaklara (projenin resmi kanalları, GitHub, DefiLlama, Token Terminal, Glassnode, CryptoQuant, Messari, Dune Analytics, CoinMarketCap/CoinGecko, ilgili zincirin blok gezgini) öncelik verip X/Twitter gibi platformlardaki genel/doğrulanmamış yorumu kaynak olarak kullanmaması için **prompt ile** yönlendirilir. Bu, Claude'un WebSearch aracında teknik bir domain engelleme mekanizması olmadığı için **kesin bir garanti değil**, güçlü bir yönlendirmedir. Doğrulayamadığı ya da emin olmadığı hiçbir şeyi yazmaması, önemli bir gelişme yoksa hiçbir şey yazmaması (uydurmaması) ayrıca istenir.
+- **Listeleme ve iptal** diğer özelliklerle aynı şekilde çalışır: **"hangi coin'leri izliyorum"**, **"HYPE izlemesini iptal et"** diyebilirsin.
+- **Yeni secret gerekmez** — mevcut `CLAUDE_CODE_OAUTH_TOKEN` / `TELEGRAM_BOT_TOKEN` / `TELEGRAM_ADMIN_CHAT_ID` yeterli.
+
+---
+
 ## 🔧 Perde arkası (3 adım)
 
 1. **Sabit veriler** — CoinGecko + Alternative.me'den fiyatlar, dominans, hacim, Fear & Greed (LLM yok → halüsinasyon yok).
@@ -197,8 +208,9 @@ Saati değiştirmek için workflow'daki `DELIVER_AT_TR` değerini (ve istersen c
 ```
 .
 ├── report.py            # Ana akış: veri → rapor → kart + brief + ses + detay gönderimi
-├── asistan.py           # Soru-cevap asistanı: admin sorularını Claude ile cevaplar, zamanlı mail görevlerini ve fiyat alarmlarını yönetir
+├── asistan.py           # Soru-cevap asistanı: admin sorularını Claude ile cevaplar, zamanlı mail görevlerini, fiyat alarmlarını ve haber izlemelerini yönetir
 ├── futures.py           # Futures sinyalleri (8 saatte bir): CoinGecko'dan gerçek mum verisi + ATR/EMA hesabı
+├── haber_izleme.py      # Coin haber izleme (6 saatte bir): birincil kaynaklı derin araştırma, sadece yeni/önemli gelişmeleri bildirir
 ├── kart.py              # Paylaşılabilir sabah kartı (Pillow)
 ├── ses.py               # 45 sn sesli özet (edge-tts + ffmpeg)
 ├── setup.py             # Kurulum sihirbazı (chat_id, test, .env, GitHub)
@@ -209,11 +221,13 @@ Saati değiştirmek için workflow'daki `DELIVER_AT_TR` değerini (ve istersen c
 ├── state/hafiza.json    # Kullanıcı hakkında öğrenilen kalıcı notlar (otomatik oluşur)
 ├── state/alarmlar.json  # Fiyat alarmları (aktif/tetiklendi) (otomatik oluşur)
 ├── state/portfoy.json   # Portföydeki varlıklar (coin + miktar) (otomatik oluşur)
-├── .github/workflows/   # daily-report.yml (08:00 TSİ) + asistan.yml + futures.yml (8 saatte bir) + tests.yml
+├── state/haber_izleme.json  # İzlenen coin'ler + bildirilmiş haber başlıkları (otomatik oluşur)
+├── .github/workflows/   # daily-report.yml (08:00 TSİ) + asistan.yml + futures.yml (8 saatte bir) + haber-izleme.yml (6 saatte bir) + tests.yml
 ├── CLAUDE.md            # Claude Code'un otomatik kurulum rehberi
 ├── test_report.py       # Birim testler
 ├── test_asistan.py      # Soru-cevap asistanı için birim testler
 ├── test_futures.py      # Futures sinyalleri için birim testler
+├── test_haber_izleme.py # Haber izleme için birim testler
 ├── LICENSE              # MIT
 └── .env.example
 ```

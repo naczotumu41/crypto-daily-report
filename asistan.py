@@ -95,6 +95,7 @@ from report import (
     mesaji_bol,
     telegram_gonder,
 )
+from haber_izleme import _izlenenleri_oku, _izlenenleri_yaz
 
 _env_yukle()
 
@@ -115,7 +116,7 @@ BUGÜNÜN TARİHİ VE SAATİ (TSİ): {simdi}
 KULLANICI HAKKINDA BİLDİKLERİN (varsa, cevabını buna göre kişiselleştir):
 {hafiza}
 
-AKTİF ALARMLARIN VE BEKLEYEN GÖREVLERİN (id'ler dahil — 'listele' sorularında ve 'iptal et' isteklerinde bunu kullan):
+AKTİF ALARMLARIN, BEKLEYEN GÖREVLERİN VE HABER İZLEMELERİN (id'ler dahil — 'listele' sorularında ve 'iptal et' isteklerinde bunu kullan):
 {aktif_ozet}
 
 PORTFÖYÜNDEKİ VARLIKLARIN (miktar; CANLI DEĞER YOK — güncel değer sorulursa DURUM F'yi kullan):
@@ -150,11 +151,11 @@ DURUM C — Kullanıcı senden bir FİYAT ALARMI kurmanı istiyor. İki tür ola
 
   Her iki durumda da: kullanıcıya TEK CÜMLELİK kısa bir onay yaz, hemen altına ilgili bloğu ekle, coingecko_id'yi mümkün olduğunca doğru ver. Bu durumda NORMAL cevap yazma, SADECE onay cümlesi + alarm bloğunu yaz.
 
-DURUM D — Kullanıcı senden bir ALARMI ya da GÖREVİ (bekleyen maili) İPTAL etmeni istiyor (ör. "BTC alarmını iptal et", "yarınki maili iptal et"):
-  1. Yukarıdaki AKTİF ALARMLARIN VE BEKLEYEN GÖREVLERİN listesinden hangi öğeyi kastettiğini (sembol/açıklamaya göre) bul.
+DURUM D — Kullanıcı senden bir ALARMI, GÖREVİ (bekleyen maili) ya da HABER İZLEMESİNİ İPTAL etmeni istiyor (ör. "BTC alarmını iptal et", "yarınki maili iptal et", "HYPE'ı haber izlemeden çıkar"):
+  1. Yukarıdaki AKTİF ALARMLARIN, BEKLEYEN GÖREVLERİN VE HABER İZLEMELERİN listesinden hangi öğeyi kastettiğini (sembol/açıklamaya göre) bul.
   2. Net şekilde eşleştirebilirsen: kullanıcıya TEK CÜMLELİK kısa bir onay yaz (ör. "Tamam, BTC alarmını iptal ettim."), hemen altına TAM bu formatta bir iptal bloğu ekle (Telegram'a GİTMEYECEK):
 ===IPTAL===
-{{"tur": "alarm" veya "gorev", "id": "listeden AYNEN kopyaladığın id"}}
+{{"tur": "alarm" veya "gorev" veya "haber_izleme", "id": "listeden AYNEN kopyaladığın id"}}
 ===IPTAL-SON===
      Bu durumda NORMAL cevap yazma, SADECE onay cümlesi + iptal bloğunu yaz.
   3. Eşleştiremezsen (liste boş, ya da hangi öğe belli değilse): İPTAL bloğu YAZMA, DURUM B gibi kullanıcıdan netleştirme iste.
@@ -175,8 +176,17 @@ DURUM F — Kullanıcı portföyünün GÜNCEL DEĞERİNİ/DURUMUNU soruyor (ör
 ===PORTFOY_SORGU===
 ===PORTFOY_SORGU-SON===
 
-DURUM B — Diğer her şey (soru, haber talebi, "neden düştü/battı" gibi açıklama istekleri, aktif alarm/görevleri LİSTELEME istekleri, genel sohbet):
-  Doğrudan cevap ver. Soru güncel bir olayla ilgiliyse WebSearch ile son gelişmeleri araştır; yalnızca doğruladığın bilgiyi yaz, uydurma, önemli iddialarda kaynak belirt. Kullanıcı aktif alarm/görevlerini sorarsa (ör. "alarmlarım neler", "bekleyen görevlerim var mı"), yukarıdaki AKTİF ALARMLARIN VE BEKLEYEN GÖREVLERİN bilgisini düzenli bir liste halinde sun (id'leri gösterme, sadece sembol/hedef/zaman gibi anlamlı bilgiyi).
+DURUM G — Kullanıcı bir coin'i HABER İZLEMEYE eklemek istiyor (ör. "HYPE ile ilgili önemli bir haber çıkarsa haber ver", "HYPE'ı haber için izle"):
+  1. Kullanıcıya TEK CÜMLELİK kısa bir onay yaz (ör. "Tamam, HYPE ile ilgili önemli bir gelişme olursa haber vereceğim.").
+  2. Onay cümlesinin hemen altına, TAM bu formatta bir haber izleme bloğu ekle (Telegram'a GİTMEYECEK):
+===HABER_IZLEME===
+{{"coingecko_id": "coingecko.com'daki DOĞRU api id'si", "sembol": "gösterim sembolü"}}
+===HABER_IZLEME-SON===
+  - Bu durumda NORMAL cevap yazma, SADECE onay cümlesi + blok.
+  - Bu, sabit fiyat/yüzde alarmından FARKLIDIR — sayısal bir eşik değil, gerçek gelişme/olay bazlıdır; ayrı, 6 saatte bir çalışan derin bir araştırmayla kontrol edilir (Claude bu araştırmada sadece birincil kaynaklara — resmi kanallar, DefiLlama, Messari, Glassnode, CryptoQuant, Token Terminal, Dune, CoinGecko/CMC, blok gezginleri — güvenir, X/sosyal medya spekülasyonuna dayanmaz).
+
+DURUM B — Diğer her şey (soru, haber talebi, "neden düştü/battı" gibi açıklama istekleri, aktif alarm/görevleri/haber izlemelerini LİSTELEME istekleri, genel sohbet):
+  Doğrudan cevap ver. Soru güncel bir olayla ilgiliyse WebSearch ile son gelişmeleri araştır; yalnızca doğruladığın bilgiyi yaz, uydurma, önemli iddialarda kaynak belirt. Kullanıcı aktif alarm/görev/izlemelerini sorarsa (ör. "alarmlarım neler", "bekleyen görevlerim var mı", "hangi coin'leri haber için izliyorum"), yukarıdaki AKTİF ALARMLARIN, BEKLEYEN GÖREVLERİN VE HABER İZLEMELERİN bilgisini düzenli bir liste halinde sun (id'leri gösterme, sadece sembol/hedef/zaman gibi anlamlı bilgiyi).
 
   ÇIKTI KURALLARI (DURUM B için):
   - Telegram HTML kullan (<b>, <i>, <a href="">); markdown/tablo KULLANMA.
@@ -189,7 +199,7 @@ DURUM B — Diğer her şey (soru, haber talebi, "neden düştü/battı" gibi a�
   - Finansal görüş/yorum içeren cevapların sonuna kısaca "Yatırım tavsiyesi
     değildir." ekle.
 
-GENEL KURAL — HAFIZA GÜNCELLEME (DURUM A/B/C/D/E/F fark etmez):
+GENEL KURAL — HAFIZA GÜNCELLEME (DURUM A/B/C/D/E/F/G fark etmez):
 Bu mesajdan kullanıcı hakkında YENİ ve KALICI bir bilgi/tercih öğrendiysen
 (ör. hangi coin'lerle ilgilendiği, risk toleransı, hangi tür raporu/üslubu
 sevdiği, tekrar eden istekleri), cevabının/görev bloğunun ALTINA ayrı bir
@@ -415,7 +425,7 @@ def _iptal_ayikla(cevap):
     if m:
         try:
             v = json.loads(m.group(1).strip())
-            if isinstance(v, dict) and v.get("tur") in ("alarm", "gorev") and v.get("id"):
+            if isinstance(v, dict) and v.get("tur") in ("alarm", "gorev", "haber_izleme") and v.get("id"):
                 iptal = v
         except ValueError:
             iptal = None
@@ -447,6 +457,22 @@ def _portfoy_sorgu_ayikla(cevap):
     sorgulandi = bool(re.search(r"===PORTFOY_SORGU===", cevap))
     temiz = re.sub(r"===PORTFOY_SORGU===.*?===PORTFOY_SORGU-SON===", "", cevap, flags=re.S).strip()
     return temiz, sorgulandi
+
+
+def _haber_izleme_ayikla(cevap):
+    """Claude'un ham cevabından ===HABER_IZLEME===...===HABER_IZLEME-SON===
+    bloğunu ayıklar. (temiz_cevap, izleme_dict_or_None) döndürür."""
+    m = re.search(r"===HABER_IZLEME===\s*(.*?)\s*===HABER_IZLEME-SON===", cevap, re.S)
+    izleme = None
+    if m:
+        try:
+            v = json.loads(m.group(1).strip())
+            if isinstance(v, dict) and v.get("coingecko_id"):
+                izleme = v
+        except ValueError:
+            izleme = None
+    temiz = re.sub(r"===HABER_IZLEME===.*?===HABER_IZLEME-SON===", "", cevap, flags=re.S).strip()
+    return temiz, izleme
 
 
 # --------------------------------------------------------------------------- #
@@ -548,13 +574,14 @@ def _yuzde_degisimi_hesapla(coingecko_id, pencere_dakika):
 
 
 def _aktif_ozet_olustur():
-    """Aktif alarm ve bekleyen görevleri, Claude'a bağlam olarak verilecek
-    kısa bir metin halinde özetler (id'ler dahil — 'listele'/'iptal et'
-    isteklerinde kullanılır)."""
+    """Aktif alarm, bekleyen görev ve haber izlemelerini, Claude'a bağlam
+    olarak verilecek kısa bir metin halinde özetler (id'ler dahil —
+    'listele'/'iptal et' isteklerinde kullanılır)."""
     alarmlar = [a for a in _alarmlari_oku() if a.get("durum") == "aktif"]
     gorevler = [g for g in _gorevleri_oku() if g.get("durum") == "bekliyor"]
-    if not alarmlar and not gorevler:
-        return "Şu an aktif alarm veya bekleyen görev yok."
+    izlemeler = [i for i in _izlenenleri_oku() if i.get("durum") == "aktif"]
+    if not alarmlar and not gorevler and not izlemeler:
+        return "Şu an aktif alarm, bekleyen görev ya da haber izlemesi yok."
 
     satirlar = []
     for a in alarmlar:
@@ -574,6 +601,8 @@ def _aktif_ozet_olustur():
             f"- [GOREV id={g.get('id')}] {g.get('hedef_zaman')} — "
             f"{str(g.get('icerik_talebi', ''))[:80]}"
         )
+    for i in izlemeler:
+        satirlar.append(f"- [HABER_IZLEME id={i.get('id')}] {i.get('sembol')} haber izleniyor")
     return "\n".join(satirlar)
 
 
@@ -939,6 +968,7 @@ def cevapla(bot_token, admin_id, grup_id=None, kanal_id=None):
                 cevap, iptal = _iptal_ayikla(cevap)
                 cevap, portfoy_islem = _portfoy_ayikla(cevap)
                 cevap, portfoy_sorgu = _portfoy_sorgu_ayikla(cevap)
+                cevap, izleme = _haber_izleme_ayikla(cevap)
                 cevap, yeni_notlar = _hafiza_notlarini_ayikla(cevap)
                 if yeni_notlar:
                     print(f"[bilgi] Hafızaya {len(yeni_notlar)} yeni not eklendi.", file=sys.stderr)
@@ -950,6 +980,7 @@ def cevapla(bot_token, admin_id, grup_id=None, kanal_id=None):
                 iptal = None
                 portfoy_islem = None
                 portfoy_sorgu = False
+                izleme = None
 
             if portfoy_sorgu:
                 print("[bilgi] Portföy değeri sorgulandı, canlı hesaplanıyor...", file=sys.stderr)
@@ -959,6 +990,20 @@ def cevapla(bot_token, admin_id, grup_id=None, kanal_id=None):
                 yeni_miktar = _portfoy_islemini_uygula(portfoy_islem)
                 etiket = portfoy_islem.get("sembol") or portfoy_islem["coingecko_id"]
                 print(f"[bilgi] Portföy güncellendi: {etiket} -> {yeni_miktar}", file=sys.stderr)
+
+            if izleme:
+                izlenenler = _izlenenleri_oku()
+                izlenenler.append({
+                    "id": uuid.uuid4().hex[:8],
+                    "coingecko_id": str(izleme["coingecko_id"]).strip(),
+                    "sembol": str(izleme.get("sembol") or izleme["coingecko_id"]).strip(),
+                    "chat_id": chat_id,
+                    "olusturulma_zamani": datetime.now(IST).isoformat(),
+                    "durum": "aktif",
+                    "bilinen_basliklar": [],
+                })
+                _izlenenleri_yaz(izlenenler)
+                print(f"[bilgi] Yeni haber izlemesi kaydedildi: {izlenenler[-1]}", file=sys.stderr)
 
             if iptal:
                 bulundu = False
@@ -971,6 +1016,15 @@ def cevapla(bot_token, admin_id, grup_id=None, kanal_id=None):
                             break
                     if bulundu:
                         _alarmlari_yaz(alarmlar)
+                elif iptal["tur"] == "haber_izleme":
+                    izlenenler = _izlenenleri_oku()
+                    for i in izlenenler:
+                        if i.get("id") == iptal["id"] and i.get("durum") == "aktif":
+                            i["durum"] = "iptal_edildi"
+                            bulundu = True
+                            break
+                    if bulundu:
+                        _izlenenleri_yaz(izlenenler)
                 else:
                     gorevler = _gorevleri_oku()
                     for g in gorevler:
