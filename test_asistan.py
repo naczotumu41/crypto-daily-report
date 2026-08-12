@@ -244,6 +244,131 @@ class AlarmAyiklama(unittest.TestCase):
         _, alarm = asistan._alarm_ayikla(ham)
         self.assertIsNone(alarm)
 
+    def test_yuzde_alarm_blogu_kabul_edilir(self):
+        ham = (
+            "Tamam, BTC 1 saatte %5'ten fazla hareket ederse haber vereceğim.\n"
+            "===ALARM===\n"
+            '{"tur": "yuzde", "coingecko_id": "bitcoin", "sembol": "BTC", '
+            '"yuzde_esik": 5, "pencere_dakika": 60}\n'
+            "===ALARM-SON==="
+        )
+        temiz, alarm = asistan._alarm_ayikla(ham)
+        self.assertEqual(temiz, "Tamam, BTC 1 saatte %5'ten fazla hareket ederse haber vereceğim.")
+        self.assertEqual(alarm["tur"], "yuzde")
+        self.assertEqual(alarm["yuzde_esik"], 5)
+        self.assertEqual(alarm["pencere_dakika"], 60)
+
+    def test_yuzde_alarm_esik_eksikse_yoksayilir(self):
+        ham = ('===ALARM===\n{"tur": "yuzde", "coingecko_id": "bitcoin", "pencere_dakika": 60}\n'
+               "===ALARM-SON===")
+        _, alarm = asistan._alarm_ayikla(ham)
+        self.assertIsNone(alarm)
+
+    def test_yuzde_alarm_negatif_esik_yoksayilir(self):
+        ham = ('===ALARM===\n{"tur": "yuzde", "coingecko_id": "bitcoin", "yuzde_esik": -5}\n'
+               "===ALARM-SON===")
+        _, alarm = asistan._alarm_ayikla(ham)
+        self.assertIsNone(alarm)
+
+
+class YuzdeDegisimiHesaplama(unittest.TestCase):
+    def setUp(self):
+        self._orig_get_json = asistan._get_json
+
+    def tearDown(self):
+        asistan._get_json = self._orig_get_json
+
+    def test_esik_asan_degisim_dogru_hesaplanir(self):
+        simdi_ms = 1_000_000_000_000
+        asistan._get_json = lambda url, params=None: {"prices": [
+            [simdi_ms - 60 * 60 * 1000, 100.0],   # 60 dk önce
+            [simdi_ms - 30 * 60 * 1000, 103.0],   # 30 dk önce
+            [simdi_ms, 106.0],                    # şimdi
+        ]}
+        sonuc = asistan._yuzde_degisimi_hesapla("bitcoin", 60)
+        self.assertIsNotNone(sonuc)
+        eski, guncel, yuzde = sonuc
+        self.assertEqual(eski, 100.0)
+        self.assertEqual(guncel, 106.0)
+        self.assertAlmostEqual(yuzde, 6.0, places=3)
+
+    def test_yetersiz_veri_none_doner(self):
+        asistan._get_json = lambda url, params=None: {"prices": [[1, 100.0]]}
+        self.assertIsNone(asistan._yuzde_degisimi_hesapla("bitcoin", 60))
+
+    def test_pencereden_uzun_veri_en_eskiyi_kullanir(self):
+        # pencere_dakika=1000 ama elimizdeki veri sadece son 60 dk'yı kapsıyor
+        simdi_ms = 1_000_000_000_000
+        asistan._get_json = lambda url, params=None: {"prices": [
+            [simdi_ms - 60 * 60 * 1000, 100.0],
+            [simdi_ms, 110.0],
+        ]}
+        sonuc = asistan._yuzde_degisimi_hesapla("bitcoin", 1000)
+        self.assertEqual(sonuc[0], 100.0)  # en eski veri noktası kullanıldı
+
+
+class YuzdeAlarmKontrolu(unittest.TestCase):
+    def setUp(self):
+        self._orig_oku = asistan._alarmlari_oku
+        self._orig_yaz = asistan._alarmlari_yaz
+        self._orig_hesapla = asistan._yuzde_degisimi_hesapla
+        self._orig_gonder = asistan.telegram_gonder
+        self._gonderilenler = []
+        self._yazilan = None
+        asistan.telegram_gonder = lambda *a, **k: self._gonderilenler.append((a, k))
+
+    def tearDown(self):
+        asistan._alarmlari_oku = self._orig_oku
+        asistan._alarmlari_yaz = self._orig_yaz
+        asistan._yuzde_degisimi_hesapla = self._orig_hesapla
+        asistan.telegram_gonder = self._orig_gonder
+
+    def test_esik_asilinca_tetiklenir_ama_aktif_kalir(self):
+        asistan._alarmlari_oku = lambda: [
+            {"id": "y1", "tur": "yuzde", "coingecko_id": "bitcoin", "sembol": "BTC",
+             "yuzde_esik": 5, "pencere_dakika": 60, "durum": "aktif"}
+        ]
+        asistan._yuzde_degisimi_hesapla = lambda cid, dk: (100.0, 107.0, 7.0)
+        asistan._alarmlari_yaz = lambda alarmlar: setattr(self, "_yazilan", alarmlar)
+        asistan._alarmlari_kontrol_et_ve_bildir("token", "admin")
+        self.assertEqual(len(self._gonderilenler), 1)
+        self.assertEqual(self._yazilan[0]["durum"], "aktif")  # tek seferlik DEĞİL
+        self.assertIn("son_tetiklenme_zamani", self._yazilan[0])
+
+    def test_esik_altindaysa_tetiklenmez(self):
+        asistan._alarmlari_oku = lambda: [
+            {"id": "y1", "tur": "yuzde", "coingecko_id": "bitcoin", "sembol": "BTC",
+             "yuzde_esik": 5, "pencere_dakika": 60, "durum": "aktif"}
+        ]
+        asistan._yuzde_degisimi_hesapla = lambda cid, dk: (100.0, 102.0, 2.0)
+        asistan._alarmlari_yaz = lambda alarmlar: setattr(self, "_yazilan", alarmlar)
+        asistan._alarmlari_kontrol_et_ve_bildir("token", "admin")
+        self.assertEqual(self._gonderilenler, [])
+
+    def test_cooldown_suresinde_tekrar_tetiklenmez(self):
+        yakin_gecmis = (datetime.now(IST) - timedelta(minutes=5)).isoformat()
+        asistan._alarmlari_oku = lambda: [
+            {"id": "y1", "tur": "yuzde", "coingecko_id": "bitcoin", "sembol": "BTC",
+             "yuzde_esik": 5, "pencere_dakika": 60, "durum": "aktif",
+             "son_tetiklenme_zamani": yakin_gecmis}
+        ]
+        asistan._yuzde_degisimi_hesapla = lambda cid, dk: (_ for _ in ()).throw(
+            AssertionError("cooldown içindeyken hesaplama yapılmamalı"))
+        asistan._alarmlari_kontrol_et_ve_bildir("token", "admin")
+        self.assertEqual(self._gonderilenler, [])
+
+    def test_cooldown_gecince_tekrar_tetiklenebilir(self):
+        uzak_gecmis = (datetime.now(IST) - timedelta(minutes=120)).isoformat()
+        asistan._alarmlari_oku = lambda: [
+            {"id": "y1", "tur": "yuzde", "coingecko_id": "bitcoin", "sembol": "BTC",
+             "yuzde_esik": 5, "pencere_dakika": 60, "durum": "aktif",
+             "son_tetiklenme_zamani": uzak_gecmis}
+        ]
+        asistan._yuzde_degisimi_hesapla = lambda cid, dk: (100.0, 108.0, 8.0)
+        asistan._alarmlari_yaz = lambda alarmlar: setattr(self, "_yazilan", alarmlar)
+        asistan._alarmlari_kontrol_et_ve_bildir("token", "admin")
+        self.assertEqual(len(self._gonderilenler), 1)
+
 
 class AlarmKontrolu(unittest.TestCase):
     def setUp(self):
