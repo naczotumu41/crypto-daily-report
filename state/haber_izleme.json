@@ -8,7 +8,8 @@
       "olusturulma_zamani": "2026-08-12T19:08:04.233261+03:00",
       "durum": "aktif",
       "bilinen_basliklar": [
-        "xStocks tokenize hisse senetleri Hyperliquid HyperCore'da işleme açıldı"
+        "xStocks tokenize hisse senetleri Hyperliquid HyperCore'da işleme açıldı",
+        "HIP-4 outcome market'lara yeni özellikler: oluşturma sonrası ek sonuç ekleme ve yapılandırılabilir deployer fee scale"
       ]
     }
   ]
