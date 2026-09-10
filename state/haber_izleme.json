@@ -8,7 +8,6 @@
       "olusturulma_zamani": "2026-08-12T19:08:04.233261+03:00",
       "durum": "aktif",
       "bilinen_basliklar": [
-        "Hyperliquid Policy Center ve trade[XYZ], SEC'e halka arz öncesi perpetual (IPOP) piyasaları için düzenleyici çerçeve talebiyle resmi yorum mektubu sundu",
         "Trump: CFTC, Hyperliquid'i ABD'ye tam uyumlu şekilde getirmek için çalışıyor",
         "Coinbase, Base App'e Hyperliquid altyapılı 50x kaldıraçlı perpetual işlemleri ekledi",
         "Hyperliquid validatörleri AQAv2 teklifini onayladı: USDC rezerv getirisinin %90'ı HYPE geri alımlarına yönlendirilecek",
@@ -37,7 +36,8 @@
         "SEC 13F verilerine göre UBS, Bank of Montreal ve Jane Street'in HYPE ETF'lerinde payı ortaya çıktı",
         "Hyperliquid Policy Center, CME'nin CFTC'ye açtığı davada mahkemeye amicus brief sundu",
         "Renzo Finance, Hyperliquid üzerinde Renzo Basis adlı basis trade verim ürününü başlattı",
-        "trade[XYZ], Hyperliquid'de HIP-4 tabanlı 'Events' sabit vadeli sözleşme ürününü başlattı"
+        "trade[XYZ], Hyperliquid'de HIP-4 tabanlı 'Events' sabit vadeli sözleşme ürününü başlattı",
+        "Hyperliquid HIP-3 Star testnet güncellemesi: deployer'lara on-chain whitelist ve broker yetkileri"
       ]
     }
   ]
