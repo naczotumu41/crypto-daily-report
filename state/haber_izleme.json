@@ -8,7 +8,6 @@
       "olusturulma_zamani": "2026-08-12T19:08:04.233261+03:00",
       "durum": "aktif",
       "bilinen_basliklar": [
-        "Hyperliquid validatörleri AQAv2 teklifini onayladı: USDC rezerv getirisinin %90'ı HYPE geri alımlarına yönlendirilecek",
         "AQAv2 USDC rezerv getirisi birikimi 26 Ağustos'ta başlıyor, HYPE geri alım fonuna ilk ödeme 3 Ekim'de",
         "Hyperliquid Policy Center'dan SEC/CFTC'ye perpetual kontratlar için uyumlaştırılmış sınıflandırma çerçevesi talebi",
         "Kinetiq, Hyperliquid için Elysium adlı yeni Layer 2 ağını duyurdu",
@@ -37,7 +36,8 @@
         "trade[XYZ], Hyperliquid'de HIP-4 tabanlı 'Events' sabit vadeli sözleşme ürününü başlattı",
         "Hyperliquid HIP-3 Star testnet güncellemesi: deployer'lara on-chain whitelist ve broker yetkileri",
         "ABD Adalet Bakanlığı, eski Robinhood mühendislerini Hyperliquid'de front-running suçlamasıyla suçladı",
-        "Payward, Bitnomial ve NinjaTrader Clearing üzerinden Hyperliquid HIP-3 perpetual vadeli işlemlerini ABD'li müşterilere sunma planını resmi basın bülteniyle doğruladı"
+        "Payward, Bitnomial ve NinjaTrader Clearing üzerinden Hyperliquid HIP-3 perpetual vadeli işlemlerini ABD'li müşterilere sunma planını resmi basın bülteniyle doğruladı",
+        "Hyperliquid native manuel borç verme/alma (lending) özelliğini yayına aldı"
       ]
     }
   ]
