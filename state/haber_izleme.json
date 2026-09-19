@@ -8,7 +8,6 @@
       "olusturulma_zamani": "2026-08-12T19:08:04.233261+03:00",
       "durum": "aktif",
       "bilinen_basliklar": [
-        "Kinetiq, Hyperliquid için Elysium adlı yeni Layer 2 ağını duyurdu",
         "21Shares, HYPE için THYP ticker'ıyla Nasdaq'ta işlem görecek spot ETF başvurusunda ikinci değişiklik yaptı",
         "Pump.fun, Solana dışında ilk kez HyperEVM'e genişledi ve USDC ile token işlem desteği ekledi",
         "Hyperliquid Strategies (PURR) FY2026 sonuçları: HYPE hazinesi 29,3 milyon token'a (~1,9 milyar $) ikiye katlandı",
@@ -37,7 +36,8 @@
         "Payward, Bitnomial ve NinjaTrader Clearing üzerinden Hyperliquid HIP-3 perpetual vadeli işlemlerini ABD'li müşterilere sunma planını resmi basın bülteniyle doğruladı",
         "Hyperliquid native manuel borç verme/alma (lending) özelliğini yayına aldı",
         "SEC, tokenize hisse senedi ticareti için 5 yıllık 'Innovation Exemption' düzenleyici istisnası onayladı; HYPE ve PURR yükseldi",
-        "NEAR Protocol, Hyperliquid altyapılı 'confidential-by-default' perpetual işlem özelliğini near.com'da yayına aldı"
+        "NEAR Protocol, Hyperliquid altyapılı 'confidential-by-default' perpetual işlem özelliğini near.com'da yayına aldı",
+        "1inch, HyperEVM ağını resmi olarak entegre etti"
       ]
     }
   ]
