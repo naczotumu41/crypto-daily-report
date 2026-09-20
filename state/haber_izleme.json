@@ -8,7 +8,6 @@
       "olusturulma_zamani": "2026-08-12T19:08:04.233261+03:00",
       "durum": "aktif",
       "bilinen_basliklar": [
-        "21Shares, HYPE için THYP ticker'ıyla Nasdaq'ta işlem görecek spot ETF başvurusunda ikinci değişiklik yaptı",
         "Pump.fun, Solana dışında ilk kez HyperEVM'e genişledi ve USDC ile token işlem desteği ekledi",
         "Hyperliquid Strategies (PURR) FY2026 sonuçları: HYPE hazinesi 29,3 milyon token'a (~1,9 milyar $) ikiye katlandı",
         "Valantis ve Pendle, Hyperliquid işlem ücreti indirimleri için ilk açık pazarı başlattı",
@@ -37,7 +36,8 @@
         "Hyperliquid native manuel borç verme/alma (lending) özelliğini yayına aldı",
         "SEC, tokenize hisse senedi ticareti için 5 yıllık 'Innovation Exemption' düzenleyici istisnası onayladı; HYPE ve PURR yükseldi",
         "NEAR Protocol, Hyperliquid altyapılı 'confidential-by-default' perpetual işlem özelliğini near.com'da yayına aldı",
-        "1inch, HyperEVM ağını resmi olarak entegre etti"
+        "1inch, HyperEVM ağını resmi olarak entegre etti",
+        "Hyperliquid L1 zincir TVL'i Arbitrum'u geçti, DefiLlama sıralamasında 7. sıraya yükseldi"
       ]
     }
   ]
