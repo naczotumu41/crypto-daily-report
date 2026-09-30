@@ -8,8 +8,6 @@
       "olusturulma_zamani": "2026-08-12T19:08:04.233261+03:00",
       "durum": "aktif",
       "bilinen_basliklar": [
-        "Hyperliquid HIP-3* ile izinli (permissioned) piyasa özelliği duyurdu",
-        "HIP-4 outcome market'lar mainnet'te izinsiz (permissionless) dağıtıma açıldı, hacim 3 katına çıktı",
         "Coinbase, Base ağında Coinbase gözetiminde 1:1 destekli cbHYPE (wrapped HYPE) token'ını yayına aldı",
         "Multicoin Capital HYPE pozisyonunun büyük kısmını sattı, tepe seviyesinden %75'e ulaştı",
         "Hyper Foundation, Assistance Fund'daki 37,5 milyon HYPE'ı (~912 milyon $, dolaşımdaki arzın %13'ü) kalıcı olarak yaktığını doğruladı",
@@ -37,7 +35,9 @@
         "Hyperliquid bir sonraki ağ yükseltmesinde funding rate tavanını %4'ten %0,5'e düşürüyor, HIP-4 limitlerini ikiye katlıyor",
         "SEC, olgun kripto ağları için token geri alım (buyback) programlarının Howey testi kapsamında 'temel yönetimsel çaba' vaadi sayılmayacağını netleştirdi",
         "Hyperliquid AQAv2 aktif: USDC rezerv getirisinin %90'ı HYPE geri alımına yönlendiriliyor",
-        "D3'ün Frontier programı Hyperliquid kasalarıyla entegre oldu, alan adı öncelik erişimi sunuluyor"
+        "D3'ün Frontier programı Hyperliquid kasalarıyla entegre oldu, alan adı öncelik erişimi sunuluyor",
+        "ABD Temsilciler Meclisi Denetim Komitesi, içeriden bilgi ticareti soruşturmasını Hyperliquid Labs'a genişletti",
+        "Gemini borsası HYPE için staking hizmetini yayına aldı"
       ]
     }
   ]
