@@ -8,7 +8,6 @@
       "olusturulma_zamani": "2026-08-12T19:08:04.233261+03:00",
       "durum": "aktif",
       "bilinen_basliklar": [
-        "trade[XYZ], Hyperliquid'de HIP-4 tabanlı 'Events' sabit vadeli sözleşme ürününü başlattı",
         "Hyperliquid HIP-3 Star testnet güncellemesi: deployer'lara on-chain whitelist ve broker yetkileri",
         "ABD Adalet Bakanlığı, eski Robinhood mühendislerini Hyperliquid'de front-running suçlamasıyla suçladı",
         "Payward, Bitnomial ve NinjaTrader Clearing üzerinden Hyperliquid HIP-3 perpetual vadeli işlemlerini ABD'li müşterilere sunma planını resmi basın bülteniyle doğruladı",
@@ -37,7 +36,8 @@
         "Hyperliquid Policy Center, AB MiCA incelemesi kapsamında Avrupa Komisyonu'na resmi görüş sundu",
         "Lion Group Holding, tüm Solana ve kısmi Bitcoin pozisyonunu satarak HYPE hazinesini genişletti",
         "Copper, kurumsal müşteriler için Hyperliquid perpetual işlem arayüzü başlattı",
-        "AQAv2 mekanizmasının ilk USDC rezerv getirisi ödemesi gerçekleşti (14,58 milyon $)"
+        "AQAv2 mekanizmasının ilk USDC rezerv getirisi ödemesi gerçekleşti (14,58 milyon $)",
+        "Hyperliquid perpetual verileri Bloomberg Terminal'e eklendi"
       ]
     }
   ]
