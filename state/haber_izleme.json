@@ -8,7 +8,6 @@
       "olusturulma_zamani": "2026-08-12T19:08:04.233261+03:00",
       "durum": "aktif",
       "bilinen_basliklar": [
-        "Payward, Bitnomial ve NinjaTrader Clearing üzerinden Hyperliquid HIP-3 perpetual vadeli işlemlerini ABD'li müşterilere sunma planını resmi basın bülteniyle doğruladı",
         "Hyperliquid native manuel borç verme/alma (lending) özelliğini yayına aldı",
         "SEC, tokenize hisse senedi ticareti için 5 yıllık 'Innovation Exemption' düzenleyici istisnası onayladı; HYPE ve PURR yükseldi",
         "NEAR Protocol, Hyperliquid altyapılı 'confidential-by-default' perpetual işlem özelliğini near.com'da yayına aldı",
@@ -37,7 +36,8 @@
         "AQAv2 mekanizmasının ilk USDC rezerv getirisi ödemesi gerçekleşti (14,58 milyon $)",
         "Hyperliquid perpetual verileri Bloomberg Terminal'e eklendi",
         "Grayscale Hyperliquid Staking ETF'ine (HYPG) ikinci kasa sağlayıcı olarak BitGo eklendi",
-        "Singapur MAS, Hyperliquid'in kendi düzenleyici yetki alanı dışında olduğunu açıkladı"
+        "Singapur MAS, Hyperliquid'in kendi düzenleyici yetki alanı dışında olduğunu açıkladı",
+        "Hyperliquid kümülatif protokol geliri 1,4 milyar $'ı, HYPE geri alımları 1,26 milyar $'ı geçti"
       ]
     }
   ]
