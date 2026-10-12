@@ -8,7 +8,6 @@
       "olusturulma_zamani": "2026-08-12T19:08:04.233261+03:00",
       "durum": "aktif",
       "bilinen_basliklar": [
-        "SEC, tokenize hisse senedi ticareti için 5 yıllık 'Innovation Exemption' düzenleyici istisnası onayladı; HYPE ve PURR yükseldi",
         "NEAR Protocol, Hyperliquid altyapılı 'confidential-by-default' perpetual işlem özelliğini near.com'da yayına aldı",
         "1inch, HyperEVM ağını resmi olarak entegre etti",
         "Hyperliquid L1 zincir TVL'i Arbitrum'u geçti, DefiLlama sıralamasında 7. sıraya yükseldi",
@@ -37,7 +36,8 @@
         "Grayscale Hyperliquid Staking ETF'ine (HYPG) ikinci kasa sağlayıcı olarak BitGo eklendi",
         "Singapur MAS, Hyperliquid'in kendi düzenleyici yetki alanı dışında olduğunu açıkladı",
         "Hyperliquid kümülatif protokol geliri 1,4 milyar $'ı, HYPE geri alımları 1,26 milyar $'ı geçti",
-        "SushiSwap, LayerZero ile HYPE'ı Robinhood Chain'de işleme açtı"
+        "SushiSwap, LayerZero ile HYPE'ı Robinhood Chain'de işleme açtı",
+        "HyperEVM tabanlı Papertrade borsasında Hyperliquid fiyat akışı manipülasyonuyla 1,28 milyon $ kazanç; pozisyon limitleri sıkılaştırıldı"
       ]
     }
   ]
