@@ -8,7 +8,6 @@
       "olusturulma_zamani": "2026-08-12T19:08:04.233261+03:00",
       "durum": "aktif",
       "bilinen_basliklar": [
-        "1inch, HyperEVM ağını resmi olarak entegre etti",
         "Hyperliquid L1 zincir TVL'i Arbitrum'u geçti, DefiLlama sıralamasında 7. sıraya yükseldi",
         "Volmex Bitcoin Volatilite Endeksi (BVIV) perpetual'ı Hyperliquid'de işleme açıldı",
         "CoinGecko: Hyperliquid 2026'da 429 milyon $ gelirle zincir üstü protokoller arasında lider",
@@ -37,7 +36,8 @@
         "Hyperliquid kümülatif protokol geliri 1,4 milyar $'ı, HYPE geri alımları 1,26 milyar $'ı geçti",
         "SushiSwap, LayerZero ile HYPE'ı Robinhood Chain'de işleme açtı",
         "HyperEVM tabanlı Papertrade borsasında Hyperliquid fiyat akışı manipülasyonuyla 1,28 milyon $ kazanç; pozisyon limitleri sıkılaştırıldı",
-        "EQX Labs, HyperCore'da 11 tokenize edilmiş ABD hissesi/ETF piyasası duyurdu (SPY, AAPL, TSLA vb.)"
+        "EQX Labs, HyperCore'da 11 tokenize edilmiş ABD hissesi/ETF piyasası duyurdu (SPY, AAPL, TSLA vb.)",
+        "Hyperliquid kurucusu Jeff Yan, ABD düzenlemesinin blockchain değil işletmeciler üzerinde olması gerektiğini önerdi"
       ]
     }
   ]
