@@ -8,7 +8,6 @@
       "olusturulma_zamani": "2026-08-12T19:08:04.233261+03:00",
       "durum": "aktif",
       "bilinen_basliklar": [
-        "Volmex Bitcoin Volatilite Endeksi (BVIV) perpetual'ı Hyperliquid'de işleme açıldı",
         "CoinGecko: Hyperliquid 2026'da 429 milyon $ gelirle zincir üstü protokoller arasında lider",
         "Hyperliquid perpetual piyasalarında 'trailing stop' emir tipini yayına aldı",
         "Hyperliquid açık pozisyon (open interest) 18 milyar $ ile tüm zamanların rekorunu kırdı",
@@ -37,7 +36,8 @@
         "HyperEVM tabanlı Papertrade borsasında Hyperliquid fiyat akışı manipülasyonuyla 1,28 milyon $ kazanç; pozisyon limitleri sıkılaştırıldı",
         "EQX Labs, HyperCore'da 11 tokenize edilmiş ABD hissesi/ETF piyasası duyurdu (SPY, AAPL, TSLA vb.)",
         "Hyperliquid kurucusu Jeff Yan, ABD düzenlemesinin blockchain değil işletmeciler üzerinde olması gerektiğini önerdi",
-        "Ripple Prime, Hyperliquid'deki Trade.xyz vadeli işlemlerine referanslı RWA swap'ları yayına aldı"
+        "Ripple Prime, Hyperliquid'deki Trade.xyz vadeli işlemlerine referanslı RWA swap'ları yayına aldı",
+        "Pump.fun, Hyperliquid altyapısıyla perpetual futures (BTC/ETH) işlemini devreye aldı"
       ]
     }
   ]
