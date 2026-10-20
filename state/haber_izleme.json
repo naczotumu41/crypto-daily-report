@@ -8,7 +8,6 @@
       "olusturulma_zamani": "2026-08-12T19:08:04.233261+03:00",
       "durum": "aktif",
       "bilinen_basliklar": [
-        "Hyperliquid açık pozisyon (open interest) 18 milyar $ ile tüm zamanların rekorunu kırdı",
         "Binance, HYPE'ı Seed Tag ile spot işleme açtı",
         "DoubleZero Edge, Hyperliquid için gerçek zamanlı emir defteri veri akışını yayına aldı",
         "Lion Group Holding (Nasdaq: LGHL) HYPE hazine pozisyonunu resmi basın bülteniyle doğruladı",
@@ -37,7 +36,8 @@
         "Ripple Prime, Hyperliquid'deki Trade.xyz vadeli işlemlerine referanslı RWA swap'ları yayına aldı",
         "Pump.fun, Hyperliquid altyapısıyla perpetual futures (BTC/ETH) işlemini devreye aldı",
         "Hyperliquid Policy Center, SEC'in Regulation Crypto Assets taslağına 5 değişiklik önerisiyle resmi görüş sundu",
-        "Kinetiq, Hyperliquid'in ilk L2 ağı Elysium'un 9 Kasım'da mainnet'e geçeceğini duyurdu"
+        "Kinetiq, Hyperliquid'in ilk L2 ağı Elysium'un 9 Kasım'da mainnet'e geçeceğini duyurdu",
+        "Hyperliquid Policy Center, CFTC'den AI hesaplama gücü (GPU-saat, inference token) üzerine perpetual vadeli işlem kontratlarına onay istedi"
       ]
     }
   ]
