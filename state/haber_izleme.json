@@ -8,7 +8,6 @@
       "olusturulma_zamani": "2026-08-12T19:08:04.233261+03:00",
       "durum": "aktif",
       "bilinen_basliklar": [
-        "Hyperliquid bir sonraki ağ yükseltmesinde funding rate tavanını %4'ten %0,5'e düşürüyor, HIP-4 limitlerini ikiye katlıyor",
         "SEC, olgun kripto ağları için token geri alım (buyback) programlarının Howey testi kapsamında 'temel yönetimsel çaba' vaadi sayılmayacağını netleştirdi",
         "Hyperliquid AQAv2 aktif: USDC rezerv getirisinin %90'ı HYPE geri alımına yönlendiriliyor",
         "D3'ün Frontier programı Hyperliquid kasalarıyla entegre oldu, alan adı öncelik erişimi sunuluyor",
@@ -37,7 +36,8 @@
         "Blockchain.com opsiyon ürününe HYPE'ı ekledi",
         "Multicoin Capital, 2,7 milyar $'lık hedge fonunda HYPE'ı en büyük pozisyon yaptı",
         "Grayscale, HYPG dahil 10 üründe fiziksel (in-kind) abonelik mekanizmasını başlattı",
-        "NEAR, Hyperliquid altyapılı gizli perps platformuna çapraz marjin ekledi"
+        "NEAR, Hyperliquid altyapılı gizli perps platformuna çapraz marjin ekledi",
+        "Hyperliquid Strategies (PURR) hisse geri alım programını 100 milyon dolara çıkardı"
       ]
     }
   ]
